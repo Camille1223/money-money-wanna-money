@@ -1,0 +1,21 @@
+# Runtime artifacts — never commit
+config.json
+current.xlsx
+current.meta.json
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Local backups
+*.bak
+*.tmp

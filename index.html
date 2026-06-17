@@ -1,0 +1,1986 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>The Receivables Ledger — AR 重点追款</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=IBM+Plex+Serif:ital,wght@0,300;0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --paper: #f3ece0;
+  --paper-deep: #ebe2d3;
+  --paper-shade: #e3d8c5;
+  --ink: #1a1410;
+  --ink-soft: #3d3530;
+  --ink-fade: #6b5f54;
+  --ink-ghost: #9a8c7d;
+  --rule: #cbbfa9;
+  --rule-soft: #d9cfbb;
+  --oxblood: #7a1f1f;
+  --oxblood-deep: #4f1313;
+  --brass: #a8821e;
+  --brass-deep: #6e5210;
+  --inkblue: #1f3a5f;
+  --sage: #4a6b3e;
+  --sage-deep: #2f4a25;
+  --plum: #5a2a4a;
+  --hot: #c43d2e;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { background: var(--paper); }
+body {
+  font-family: "IBM Plex Serif", "Noto Serif SC", Georgia, serif;
+  font-weight: 400;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.55;
+  font-size: 14px;
+  letter-spacing: 0.005em;
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Paper grain — subtle SVG noise overlay */
+body::before {
+  content: "";
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.10  0 0 0 0 0.08  0 0 0 0 0.06  0 0 0 0.13 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.55'/></svg>");
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+}
+/* Vignette */
+body::after {
+  content: "";
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 1;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(60, 40, 20, 0.10) 100%);
+}
+
+.app {
+  position: relative; z-index: 2;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 36px 56px 80px;
+}
+
+/* ============== MASTHEAD ============== */
+.masthead {
+  border-top: 4px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+  padding: 18px 0 14px;
+  margin-bottom: 8px;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 32px;
+}
+.masthead .edition-meta-l,
+.masthead .edition-meta-r {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-fade);
+  font-weight: 500;
+}
+.masthead .edition-meta-l { text-align: left; }
+.masthead .edition-meta-r { text-align: right; }
+.masthead .edition-meta-r b { color: var(--oxblood); font-weight: 700; letter-spacing: 0.16em; }
+.masthead .nameplate {
+  font-family: "Playfair Display", "Noto Serif SC", serif;
+  font-weight: 900;
+  font-size: 56px;
+  line-height: 1.0;
+  letter-spacing: -0.015em;
+  text-align: center;
+  color: var(--ink);
+  font-style: italic;
+}
+.masthead .nameplate em {
+  font-style: normal;
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.6em;
+  text-transform: uppercase;
+  margin-top: 8px;
+  color: var(--oxblood);
+  font-weight: 400;
+  font-family: "IBM Plex Mono", monospace;
+}
+
+/* Sub-rule double line */
+.masthead-rule {
+  height: 4px;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+  background: var(--paper);
+  margin-bottom: 26px;
+}
+
+.dateline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: -14px 0 26px;
+  padding: 0 4px;
+}
+.dateline .pull { color: var(--oxblood); font-weight: 600; }
+
+/* Toolbar / actions */
+.toolbar {
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+}
+.btn-action {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 500;
+  background: var(--ink);
+  color: var(--paper);
+  border: 1px solid var(--ink);
+  padding: 9px 18px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+.btn-action:hover {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  transform: translate(-2px, -2px);
+}
+.btn-action.btn-sync {
+  background: var(--oxblood);
+  border-color: var(--oxblood);
+  color: var(--paper);
+}
+.btn-action.btn-sync:hover {
+  background: var(--paper);
+  color: var(--oxblood);
+  box-shadow: 3px 3px 0 var(--oxblood);
+}
+.file-info {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  color: var(--ink-fade);
+  font-style: italic;
+}
+#fileInput { display: none; }
+
+/* ============== EMPTY ============== */
+.empty {
+  text-align: center;
+  padding: 100px 40px 120px;
+  position: relative;
+}
+.empty-glyph {
+  font-family: "Playfair Display", serif;
+  font-size: 200px;
+  font-style: italic;
+  color: var(--rule);
+  line-height: 1;
+  margin-bottom: -20px;
+  user-select: none;
+}
+.empty h2 {
+  font-family: "Playfair Display", serif;
+  font-size: 38px;
+  font-weight: 900;
+  font-style: italic;
+  color: var(--ink);
+  margin-bottom: 18px;
+  letter-spacing: -0.01em;
+}
+.empty p {
+  font-size: 15px;
+  color: var(--ink-soft);
+  max-width: 540px;
+  margin: 0 auto 10px;
+  line-height: 1.7;
+}
+.empty .step {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-fade);
+  margin-top: 18px;
+}
+.empty code {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  background: var(--paper-deep);
+  border: 1px solid var(--rule);
+  padding: 2px 6px;
+  color: var(--oxblood);
+}
+.empty a {
+  color: var(--oxblood);
+  text-decoration: none;
+  border-bottom: 1px solid var(--oxblood);
+  font-style: italic;
+}
+.empty a:hover { background: var(--oxblood); color: var(--paper); }
+
+/* ============== KPI / FRONT PAGE ============== */
+.front-page {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 0;
+  border-top: 1px solid var(--ink);
+  border-bottom: 3px double var(--ink);
+  margin-bottom: 28px;
+  background: linear-gradient(to bottom, transparent 0%, rgba(167, 130, 30, 0.04) 100%);
+}
+.kpi {
+  padding: 26px 28px 22px;
+  border-right: 1px solid var(--rule);
+  position: relative;
+  animation: fadeUp 0.7s cubic-bezier(.2,.7,.3,1) backwards;
+}
+.kpi:last-child { border-right: none; }
+.kpi:nth-child(1) { animation-delay: 0.05s; }
+.kpi:nth-child(2) { animation-delay: 0.12s; }
+.kpi:nth-child(3) { animation-delay: 0.19s; }
+.kpi:nth-child(4) { animation-delay: 0.26s; }
+.kpi:nth-child(5) { animation-delay: 0.33s; }
+.kpi:nth-child(6) { animation-delay: 0.40s; }
+
+.kpi.headline {
+  grid-column: 1;
+  grid-row: span 2;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 30px 32px 28px;
+  position: relative;
+  overflow: hidden;
+}
+.kpi.headline::before {
+  content: "Ⅰ";
+  position: absolute;
+  top: 8px; right: 16px;
+  font-family: "Playfair Display", serif;
+  font-style: italic;
+  font-size: 80px;
+  color: var(--brass);
+  opacity: 0.18;
+  line-height: 1;
+}
+.kpi.headline .kpi-label { color: var(--brass); border-color: var(--brass); }
+.kpi.headline .kpi-value { color: var(--paper); font-size: 64px; }
+.kpi.headline .kpi-sub { color: rgba(243, 236, 224, 0.55); }
+
+.kpi-label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--oxblood);
+  margin-bottom: 14px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid currentColor;
+  display: inline-block;
+}
+.kpi-value {
+  font-family: "Playfair Display", "Noto Serif SC", serif;
+  font-size: 38px;
+  font-weight: 700;
+  font-variant-numeric: oldstyle-nums tabular-nums;
+  letter-spacing: -0.025em;
+  line-height: 1.0;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.kpi-sub {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-fade);
+}
+
+.kpi.danger .kpi-label { color: var(--oxblood); }
+.kpi.warn .kpi-label { color: var(--brass-deep); }
+.kpi.ok .kpi-label { color: var(--sage-deep); }
+.kpi.info .kpi-label { color: var(--inkblue); }
+
+/* small ornament */
+.kpi.warn::after,
+.kpi.danger::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; width: 8px; height: 8px;
+  border-top: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+  color: var(--rule);
+}
+
+/* ============== SECTION HEADER ============== */
+.section-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 6px;
+  margin: 36px 0 16px;
+  gap: 20px;
+}
+.section-head h2 {
+  font-family: "Playfair Display", "Noto Serif SC", serif;
+  font-weight: 900;
+  font-style: italic;
+  font-size: 28px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.section-head h2 .num {
+  font-style: normal;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  color: var(--oxblood);
+  vertical-align: 4px;
+  margin-right: 12px;
+}
+.section-head .legend {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--ink-fade);
+  text-transform: uppercase;
+}
+
+/* ============== FILTERS ============== */
+.filters {
+  display: flex;
+  gap: 4px 0;
+  flex-wrap: wrap;
+  align-items: stretch;
+  margin-bottom: 28px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: 0;
+}
+.filters > label,
+.filters > .filter-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-right: 1px dotted var(--rule);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-fade);
+  font-weight: 500;
+}
+.filters select, .filters input {
+  font-family: "IBM Plex Serif", serif;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--ink);
+  padding: 2px 18px 2px 4px;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%231a1410' stroke-width='1.4' fill='none'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 2px center;
+  font-style: italic;
+  text-transform: none;
+}
+.filters select:focus, .filters input:focus {
+  border-bottom-color: var(--oxblood);
+  color: var(--oxblood);
+}
+.filters input[type=text] {
+  width: 220px;
+  background-image: none;
+  font-style: normal;
+}
+.filters .filter-search {
+  flex: 1;
+  min-width: 260px;
+}
+.filter-chip {
+  margin-left: auto;
+  padding: 0 22px;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+  border-left: 1px solid var(--ink);
+}
+.filter-chip:hover { background: var(--oxblood); }
+
+/* ============== CHARTS ============== */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  margin-bottom: 36px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.chart-card {
+  padding: 22px 24px 18px;
+  border-right: 1px solid var(--rule);
+  position: relative;
+}
+.chart-card:last-child { border-right: none; }
+.chart-card h3 {
+  font-family: "Playfair Display", "Noto Serif SC", serif;
+  font-weight: 700;
+  font-style: italic;
+  font-size: 17px;
+  color: var(--ink);
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px dotted var(--rule);
+  letter-spacing: -0.005em;
+}
+.chart-card h3::before {
+  content: "Fig. ";
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--oxblood);
+  font-style: normal;
+  vertical-align: 4px;
+  margin-right: 6px;
+}
+.chart-card:nth-child(1) h3::before { content: "Fig. I — "; }
+.chart-card:nth-child(2) h3::before { content: "Fig. II — "; }
+.chart-card:nth-child(3) h3::before { content: "Fig. III — "; }
+.chart-canvas-wrap { position: relative; height: 280px; }
+
+/* ============== LEDGER TABLE ============== */
+.table-card {
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  margin-bottom: 36px;
+  position: relative;
+}
+.table-card::before {
+  content: "";
+  position: absolute;
+  top: -5px; left: -5px; right: -5px; bottom: -5px;
+  border: 1px solid var(--rule);
+  pointer-events: none;
+  z-index: -1;
+}
+.table-header {
+  padding: 18px 22px 14px;
+  border-bottom: 3px double var(--ink);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 20px;
+}
+.table-header h2 {
+  font-family: "Playfair Display", "Noto Serif SC", serif;
+  font-weight: 900;
+  font-style: italic;
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.table-header .legend {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-fade);
+}
+.table-header .legend code {
+  background: var(--paper-deep);
+  padding: 1px 5px;
+  color: var(--oxblood);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.table-wrap {
+  overflow-x: auto;
+  max-height: 640px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink) var(--paper-deep);
+}
+.table-wrap::-webkit-scrollbar { width: 10px; height: 10px; }
+.table-wrap::-webkit-scrollbar-track { background: var(--paper-deep); }
+.table-wrap::-webkit-scrollbar-thumb { background: var(--ink-fade); border: 2px solid var(--paper-deep); }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+thead {
+  background: var(--paper-deep);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+thead th {
+  text-align: left;
+  padding: 12px 14px;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  border-bottom: 2px solid var(--ink);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+thead th:hover { background: var(--paper-shade); color: var(--oxblood); }
+thead th.sorted { color: var(--oxblood); background: var(--paper-shade); }
+thead th.sorted::after { content: " ▾"; }
+thead th.sorted.asc::after { content: " ▴"; }
+
+tbody tr {
+  border-bottom: 1px solid var(--rule-soft);
+  transition: background 0.12s;
+}
+tbody tr:nth-child(odd) { background: rgba(203, 191, 169, 0.10); }
+tbody tr:hover {
+  background: var(--paper-shade) !important;
+  cursor: pointer;
+}
+tbody td {
+  padding: 12px 14px;
+  vertical-align: top;
+}
+.priority-rank {
+  display: inline-block;
+  width: 32px; height: 32px; line-height: 30px;
+  text-align: center;
+  font-family: "Playfair Display", serif;
+  font-weight: 900;
+  font-style: italic;
+  font-size: 16px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+}
+.rank-top { color: var(--oxblood); background: rgba(122, 31, 31, 0.06); }
+.rank-mid { color: var(--brass-deep); background: rgba(168, 130, 30, 0.08); }
+.rank-low { color: var(--ink-fade); }
+
+.cust-name {
+  font-family: "Playfair Display", "Noto Serif SC", serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+.cust-id {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.1em;
+}
+
+.amount {
+  text-align: right;
+  font-family: "IBM Plex Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  font-size: 13px;
+}
+.amount-eur { color: var(--ink); font-weight: 600; }
+
+.od-badge {
+  display: inline-block;
+  padding: 3px 9px 2px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border: 1px solid currentColor;
+}
+.od-0    { color: var(--sage-deep); background: rgba(74, 107, 62, 0.08); }
+.od-30   { color: var(--brass-deep); background: rgba(168, 130, 30, 0.08); }
+.od-60   { color: #b95c00; background: rgba(185, 92, 0, 0.10); }
+.od-90   { color: var(--oxblood); background: rgba(122, 31, 31, 0.10); }
+.od-180  { color: var(--oxblood-deep); background: rgba(79, 19, 19, 0.14); }
+.od-bad  { color: var(--paper); background: var(--oxblood-deep); border-color: var(--oxblood-deep); }
+
+.paid-bar { display: flex; align-items: center; gap: 8px; }
+.paid-bar-track {
+  flex: 1; height: 4px;
+  background: var(--rule-soft);
+  min-width: 70px;
+  position: relative;
+}
+.paid-bar-fill {
+  height: 100%;
+  background: repeating-linear-gradient(45deg, var(--sage), var(--sage) 4px, var(--sage-deep) 4px, var(--sage-deep) 7px);
+}
+.paid-bar-text {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--ink-fade);
+  min-width: 48px;
+}
+
+.priority-score {
+  font-family: "Playfair Display", serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--oxblood);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============== DRAWER ============== */
+.backdrop {
+  position: fixed; inset: 0;
+  background: rgba(26, 20, 16, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  z-index: 99;
+  backdrop-filter: blur(2px);
+}
+.backdrop.open { opacity: 1; pointer-events: auto; }
+
+/* ============== SETTINGS MODAL ============== */
+.settings-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(26, 20, 16, 0.62);
+  backdrop-filter: blur(3px);
+  z-index: 200;
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 80px 20px 20px;
+}
+.settings-backdrop.open { display: flex; }
+.settings-panel {
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 12px 12px 0 var(--ink), 0 30px 80px rgba(26, 20, 16, 0.45);
+  width: 100%;
+  max-width: 640px;
+  position: relative;
+  animation: settingsIn 0.32s cubic-bezier(.2,.7,.2,1);
+}
+@keyframes settingsIn {
+  from { opacity: 0; transform: translateY(-12px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.settings-head {
+  border-bottom: 1px solid var(--ink);
+  padding: 22px 28px 18px;
+  position: relative;
+  background: linear-gradient(180deg, var(--paper-deep), var(--paper));
+}
+.settings-eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--oxblood);
+}
+.settings-head h3 {
+  font-family: "Playfair Display", serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 30px;
+  letter-spacing: -0.01em;
+  margin-top: 4px;
+  color: var(--ink);
+}
+.settings-close {
+  position: absolute;
+  top: 14px; right: 16px;
+  background: transparent;
+  border: 1px solid var(--ink);
+  width: 32px; height: 32px;
+  font-family: "Playfair Display", serif;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.settings-close:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+.settings-body { padding: 22px 28px 26px; }
+.settings-lede {
+  font-family: "IBM Plex Serif", serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin-bottom: 18px;
+  border-left: 3px solid var(--brass);
+  padding-left: 14px;
+}
+.settings-lede em {
+  font-style: italic;
+  color: var(--oxblood);
+  font-weight: 600;
+}
+.settings-label {
+  display: block;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-fade);
+  margin-bottom: 7px;
+}
+.settings-input {
+  width: 100%;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  background: var(--paper-deep);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--ink);
+  color: var(--ink);
+  padding: 10px 12px;
+  resize: vertical;
+  min-height: 78px;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.settings-input:focus {
+  background: var(--paper);
+  border-color: var(--ink);
+  border-left-color: var(--oxblood);
+}
+.settings-hint {
+  font-family: "IBM Plex Serif", serif;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--ink-fade);
+  margin-top: 8px;
+  line-height: 1.55;
+}
+.settings-status {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  margin-top: 14px;
+  min-height: 18px;
+  color: var(--ink-soft);
+}
+.settings-status.ok { color: var(--sage-deep); }
+.settings-status.err { color: var(--oxblood); }
+.settings-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+}
+
+.drawer {
+  position: fixed;
+  right: 0; top: 0; bottom: 0;
+  width: 600px;
+  background: var(--paper);
+  box-shadow: -8px 0 40px rgba(26, 20, 16, 0.30);
+  transform: translateX(100%);
+  transition: transform 0.4s cubic-bezier(.2,.7,.2,1);
+  z-index: 100;
+  overflow-y: auto;
+  border-left: 4px solid var(--ink);
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-fade) var(--paper-deep);
+}
+.drawer.open { transform: translateX(0); }
+.drawer-header {
+  padding: 22px 28px 18px;
+  border-bottom: 3px double var(--ink);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  background: var(--paper);
+  z-index: 1;
+}
+.drawer-header h3 {
+  font-family: "Playfair Display", "Noto Serif SC", serif;
+  font-weight: 900;
+  font-style: italic;
+  font-size: 26px;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  flex: 1;
+}
+.drawer-header h3::before {
+  content: "DOSSIER № ";
+  display: block;
+  font-family: "IBM Plex Mono", monospace;
+  font-style: normal;
+  font-size: 9.5px;
+  letter-spacing: 0.3em;
+  font-weight: 500;
+  color: var(--oxblood);
+  margin-bottom: 6px;
+}
+.drawer-close {
+  background: none;
+  border: 1px solid var(--ink);
+  width: 32px; height: 32px;
+  font-size: 18px;
+  font-family: "IBM Plex Serif", serif;
+  cursor: pointer;
+  color: var(--ink);
+  transition: all 0.15s;
+}
+.drawer-close:hover { background: var(--ink); color: var(--paper); }
+
+.drawer-body { padding: 24px 28px 40px; }
+.drawer-section { margin-bottom: 28px; }
+.drawer-section h4 {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--oxblood);
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--ink);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.drawer-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border: 1px solid var(--rule);
+}
+.drawer-stat {
+  padding: 12px 16px;
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.drawer-stat:nth-child(2n) { border-right: none; }
+.drawer-stat:nth-last-child(-n+2) { border-bottom: none; }
+.drawer-stat .label {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-fade);
+  margin-bottom: 4px;
+}
+.drawer-stat .value {
+  font-family: "Playfair Display", "Noto Serif SC", serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.doc-table { width: 100%; font-size: 12px; border-collapse: collapse; }
+.doc-table th {
+  padding: 8px 10px;
+  background: var(--paper-deep);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--ink-soft);
+  border-bottom: 1.5px solid var(--ink);
+}
+.doc-table td {
+  padding: 9px 10px;
+  border-bottom: 1px dotted var(--rule);
+  font-size: 11.5px;
+  vertical-align: top;
+}
+.doc-table tr:hover td { background: var(--paper-deep); }
+
+/* Section pagination dots */
+.dingbat {
+  text-align: center;
+  font-family: "Playfair Display", serif;
+  font-size: 18px;
+  letter-spacing: 0.6em;
+  color: var(--rule);
+  margin: 30px 0;
+  user-select: none;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes inkbleed {
+  from { opacity: 0; filter: blur(4px); }
+  to   { opacity: 1; filter: blur(0); }
+}
+.ink-in { animation: inkbleed 0.9s ease backwards; }
+
+/* selection */
+::selection { background: var(--oxblood); color: var(--paper); }
+
+@media (max-width: 1180px) {
+  .app { padding: 28px 24px 60px; }
+  .masthead .nameplate { font-size: 40px; }
+  .front-page { grid-template-columns: 1fr 1fr; }
+  .kpi.headline { grid-column: span 2; grid-row: auto; }
+  .charts-row { grid-template-columns: 1fr; }
+  .chart-card { border-right: none; border-bottom: 1px solid var(--rule); }
+  .drawer { width: 100%; border-left: none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ============== MASTHEAD ============== -->
+<header class="masthead">
+  <div class="edition-meta-l">
+    Vol. <span id="volNo">VI</span> · No. <span id="issueNo">06</span><br>
+    Greater China Edition
+  </div>
+  <h1 class="nameplate">
+    The Receivables Ledger
+    <em>AR · 重 点 追 款 日 报</em>
+  </h1>
+  <div class="edition-meta-r">
+    <span id="todayDate">—</span><br>
+    <b id="periodLabel">PENDING DATA · 等待数据加载</b>
+  </div>
+</header>
+<div class="masthead-rule"></div>
+
+<div class="dateline">
+  <span>Daily — 商务机密 · For Internal Use</span>
+  <span class="pull">「逾期 即 失礼」</span>
+  <span id="fileInfo">File: not yet loaded</span>
+</div>
+
+<div class="toolbar" style="justify-content:flex-end; margin-bottom: 22px;">
+  <button class="btn-action btn-sync" id="syncNowBtn" onclick="syncNow()" style="display:none;">⟲ Sync Now</button>
+  <button class="btn-action btn-sync" id="autoLoadBtn" onclick="loadFromServer()" style="display:none;">↧ Pull Latest from SharePoint</button>
+  <button class="btn-action" onclick="document.getElementById('fileInput').click()">⌘ Load / Refresh Excel</button>
+  <button class="btn-action" id="settingsBtn" onclick="openSettings()" title="Configure your SharePoint link">⚙ Source</button>
+  <input type="file" id="fileInput" accept=".xlsx,.xls">
+</div>
+
+<!-- ============== SETTINGS MODAL ============== -->
+<div id="settingsBackdrop" class="settings-backdrop" onclick="if(event.target===this) closeSettings()">
+  <div class="settings-panel">
+    <div class="settings-head">
+      <span class="settings-eyebrow">№ Configuration</span>
+      <h3>Source Ledger</h3>
+      <button class="settings-close" onclick="closeSettings()" aria-label="Close">×</button>
+    </div>
+    <div class="settings-body">
+      <p class="settings-lede">
+        Paste the SharePoint share link of <em>your</em> Master Report Excel file.
+        The dashboard will resolve it via Microsoft Graph and refresh on every sync.
+      </p>
+      <label class="settings-label" for="settingsUrl">SharePoint File Link</label>
+      <textarea id="settingsUrl" class="settings-input"
+        placeholder="https://sap.sharepoint.com/teams/.../Master%20Report_GC_%20YYYYMM_YourName.xlsx"></textarea>
+      <p class="settings-hint">
+        In SharePoint, open the file → <b>Share</b> → <b>Copy link</b>.
+        Anyone with access in your tenant works; no permission change needed.
+      </p>
+      <div class="settings-status" id="settingsStatus"></div>
+      <div class="settings-actions">
+        <button class="btn-action" onclick="closeSettings()">Cancel</button>
+        <button class="btn-action btn-sync" onclick="saveSettings()">Save &amp; Sync</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============== EMPTY STATE ============== -->
+<div id="emptyState" class="empty">
+  <div class="empty-glyph">¶</div>
+  <h2>Awaiting the Ledger</h2>
+  <p>First time? Tap <b>⚙ Source</b> above and paste <em>your</em> Master Report SharePoint link — the dashboard will sync it automatically on every refresh.</p>
+  <p>Already synced? Use <b>↧ Pull Latest</b>. Or load a local file via <b>⌘ Load / Refresh Excel</b>.</p>
+  <p style="font-size:12px; color:var(--ink-fade); margin-top:14px;">All computation runs locally in your browser — no data leaves the page.</p>
+</div>
+
+<!-- ============== DASHBOARD ============== -->
+<div id="dashboard" style="display:none;">
+
+<!-- Front-page KPI block -->
+<div class="front-page">
+  <div class="kpi headline danger">
+    <div class="kpi-label">Open Balance · 未付总额 · EUR</div>
+    <div class="kpi-value" id="kpiTotalOpen">—</div>
+    <div class="kpi-sub" id="kpiTotalOpenSub">—</div>
+  </div>
+  <div class="kpi danger">
+    <div class="kpi-label">Past 90d · 逾期 &gt;90 天</div>
+    <div class="kpi-value" id="kpiOver90">—</div>
+    <div class="kpi-sub" id="kpiOver90Sub">—</div>
+  </div>
+  <div class="kpi ok">
+    <div class="kpi-label">Collected · 已收款 EUR</div>
+    <div class="kpi-value" id="kpiPaid">—</div>
+    <div class="kpi-sub" id="kpiPaidSub">—</div>
+  </div>
+  <div class="kpi info">
+    <div class="kpi-label">Customers · 客户 · Docs</div>
+    <div class="kpi-value" id="kpiCustomers">—</div>
+    <div class="kpi-sub" id="kpiCustomersSub">—</div>
+  </div>
+  <div class="kpi warn">
+    <div class="kpi-label">FC Recovery · 本月 FC 收款率</div>
+    <div class="kpi-value" id="kpiCurFC">—</div>
+    <div class="kpi-sub" id="kpiCurFCSub">—</div>
+  </div>
+</div>
+
+<!-- Top1 highlighted as a "lead story" box -->
+<div class="section-head">
+  <h2><span class="num">§ I</span>The Lead Story</h2>
+  <span class="legend">Top priority · 优先级最高客户</span>
+</div>
+<div style="border:1px solid var(--ink); padding: 22px 28px; margin-bottom: 30px; display:grid; grid-template-columns: auto 1fr auto; gap: 28px; align-items:center; background: var(--paper-deep);">
+  <div style="font-family:'Playfair Display', serif; font-style:italic; font-weight:900; font-size: 80px; color: var(--oxblood); line-height: 1;">№1</div>
+  <div>
+    <div style="font-family:'IBM Plex Mono', monospace; font-size:10px; letter-spacing: 0.22em; text-transform:uppercase; color: var(--ink-fade); margin-bottom:6px;">In Focus · 重点客户</div>
+    <div id="kpiTopCust" style="font-family:'Playfair Display','Noto Serif SC', serif; font-weight:900; font-style:italic; font-size: 32px; color: var(--ink); letter-spacing: -0.01em; line-height:1.15;">—</div>
+    <div id="kpiTopCustSub" style="font-family:'IBM Plex Mono', monospace; font-size:11px; color: var(--ink-soft); letter-spacing: 0.1em; margin-top: 6px;">—</div>
+  </div>
+  <div style="font-family:'Playfair Display', serif; font-style:italic; color: var(--rule); font-size: 60px;">❦</div>
+</div>
+
+<!-- ============== FILTERS ============== -->
+<div class="section-head">
+  <h2><span class="num">§ II</span>Reading Room</h2>
+  <span class="legend">Filters · 视图筛选</span>
+</div>
+<div class="filters">
+  <label>MU
+    <select id="filterMU"><option value="">All</option></select>
+  </label>
+  <label>Collector
+    <select id="filterCollector"><option value="">All</option></select>
+  </label>
+  <label>Aging
+    <select id="filterOD">
+      <option value="">All</option>
+      <option value="not_overdue">≤ 0 · 未逾期</option>
+      <option value="0_30">1—30 d</option>
+      <option value="30_60">31—60 d</option>
+      <option value="60_90">61—90 d</option>
+      <option value="90_180">91—180 d</option>
+      <option value="180_365">181—365 d</option>
+      <option value="365">&gt; 365 d</option>
+    </select>
+  </label>
+  <label>Status
+    <select id="filterPaid">
+      <option value="">All</option>
+      <option value="open">Open · 未付</option>
+      <option value="partial">Partial · 部分</option>
+      <option value="paid">Paid · 已付</option>
+    </select>
+  </label>
+  <label>FC Month
+    <select id="filterFC"><option value="">All</option></select>
+  </label>
+  <label class="filter-search">Search
+    <input type="text" id="filterSearch" placeholder="customer · sold-to · doc no.">
+  </label>
+  <button class="filter-chip" onclick="resetFilters()">Reset</button>
+</div>
+
+<!-- ============== CHARTS ============== -->
+<div class="section-head">
+  <h2><span class="num">§ III</span>Cabinet of Figures</h2>
+  <span class="legend">Visual analytics · 视觉分析</span>
+</div>
+<div class="charts-row">
+  <div class="chart-card">
+    <h3>Open Balance by Aging Bucket</h3>
+    <div class="chart-canvas-wrap"><canvas id="odChart"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <h3>Top 10 Open Accounts</h3>
+    <div class="chart-canvas-wrap"><canvas id="topChart"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <h3>FC Month — Paid against Open</h3>
+    <div class="chart-canvas-wrap"><canvas id="fcChart"></canvas></div>
+  </div>
+</div>
+
+<div class="dingbat">❦ &nbsp; · &nbsp; ❦ &nbsp; · &nbsp; ❦</div>
+
+<!-- ============== LEDGER TABLE ============== -->
+<div class="table-card">
+  <div class="table-header">
+    <h2>The Pursuit Ledger</h2>
+    <span class="legend">Priority = Open EUR × (1 + OD ÷ 30) · click any row · <code>优先级 = 未付EUR × (1 + OD天数/30)</code></span>
+  </div>
+  <div class="table-wrap">
+    <table id="custTable">
+      <thead>
+        <tr>
+          <th data-sort="rank" style="width:64px;">№</th>
+          <th data-sort="name">Account · 客户</th>
+          <th data-sort="mu" style="width:80px;">MU</th>
+          <th data-sort="collector" style="width:150px;">Collector</th>
+          <th data-sort="open_eur" style="text-align:right;">Open EUR</th>
+          <th data-sort="max_od" style="text-align:center; width:90px;">Max OD</th>
+          <th data-sort="avg_od" style="text-align:center; width:80px;">Avg OD</th>
+          <th data-sort="paid_ratio" style="width:170px;">Paid / Open</th>
+          <th data-sort="priority" class="sorted" style="text-align:right; width:130px;">Priority</th>
+        </tr>
+      </thead>
+      <tbody id="custTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="dingbat">— Fin —</div>
+
+</div><!-- /dashboard -->
+
+</div><!-- /app -->
+
+<!-- ============== DRAWER ============== -->
+<div class="backdrop" id="backdrop" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <h3 id="drawerTitle">Account Detail</h3>
+    <button class="drawer-close" onclick="closeDrawer()">×</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</div>
+
+<script>
+// ============== State ==============
+let RAW = [];          // raw rows (objects)
+let HEADER_MAP = {};   // normalized header -> actual column key
+let CUSTOMERS = [];    // aggregated per Sold-to
+let SORT_KEY = 'priority';
+let SORT_DIR = 'desc';
+let CHART_OD = null;
+let CHART_TOP = null;
+let CHART_FC = null;
+
+// ============== Helpers ==============
+const fmt = (n) => {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  if (Math.abs(n) >= 1e6) return (n/1e6).toFixed(2) + 'M';
+  if (Math.abs(n) >= 1e3) return (n/1e3).toFixed(1) + 'K';
+  return n.toFixed(0);
+};
+const fmtFull = (n) => {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  return Number(n).toLocaleString('en-US', {maximumFractionDigits: 0});
+};
+const odBucket = (od) => {
+  if (od === null || od === undefined) return 'not_overdue';
+  if (od <= 0) return 'not_overdue';
+  if (od <= 30) return '0_30';
+  if (od <= 60) return '30_60';
+  if (od <= 90) return '60_90';
+  if (od <= 180) return '90_180';
+  if (od <= 365) return '180_365';
+  return '365';
+};
+const odBadgeClass = (od) => {
+  if (od === null || od === undefined || od <= 0) return 'od-0';
+  if (od <= 30) return 'od-30';
+  if (od <= 60) return 'od-60';
+  if (od <= 90) return 'od-90';
+  if (od <= 180) return 'od-180';
+  return 'od-bad';
+};
+const excelDateToStr = (v) => {
+  if (!v) return '';
+  if (v instanceof Date) {
+    return v.toISOString().slice(0,10);
+  }
+  if (typeof v === 'number') {
+    // Excel serial date
+    const date = new Date(Math.round((v - 25569) * 86400 * 1000));
+    return date.toISOString().slice(0,10);
+  }
+  return String(v);
+};
+
+// ============== File loading ==============
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('fileInfo').textContent = '解析中...';
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type: 'array', cellDates: true});
+    const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('master')) || 'Master Report';
+    const ws = wb.Sheets[sheetName];
+    if (!ws) throw new Error('找不到 Master Report sheet');
+    // header is on row 2 (index 1)
+    const json = XLSX.utils.sheet_to_json(ws, {range: 1, defval: null, raw: false, dateNF: 'yyyy-mm-dd'});
+    // raw:false converts to display strings; we need raw numbers for amounts. Re-read with raw:true:
+    const jsonRaw = XLSX.utils.sheet_to_json(ws, {range: 1, defval: null, raw: true});
+    // Excel headers in this report have stray leading/trailing spaces (e.g. " Open Balance in EUR ").
+    // Normalize every row's keys by trimming whitespace so downstream lookups work reliably.
+    RAW = jsonRaw.map(row => {
+      const clean = {};
+      for (const k of Object.keys(row)) {
+        // trim AND collapse non-breaking space + multiple whitespace into a single regular space
+        const cleanKey = String(k).replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
+        clean[cleanKey] = row[k];
+      }
+      return clean;
+    });
+    document.getElementById('fileInfo').textContent =
+      `已加载: ${file.name} · ${RAW.length} 行 · ${new Date().toLocaleString('zh-CN')}`;
+    document.getElementById('periodLabel').textContent = file.name.replace(/\.xlsx$/i, '').toUpperCase();
+    process();
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+  } catch (err) {
+    alert('读取失败: ' + err.message);
+    console.error(err);
+  }
+});
+
+// ============== Aggregation ==============
+function process() {
+  const byCust = new Map();
+  for (const r of RAW) {
+    const sid = r['Sold-to Number'];
+    if (!sid) continue;
+    if (!byCust.has(sid)) {
+      byCust.set(sid, {
+        sold_to: sid,
+        name: r['Sold-To Party Name'] || '',
+        mu: r['MU'] || '',
+        segment: r['Segment'] || '',
+        collector: (r['Collector Name'] || r['Collector Name'] || '').trim(),
+        company_code: r['Company Code'] || '',
+        ae: r['Account Executive Name'] || '',
+        flm: r['First Line Manager'] || '',
+        docs: [],
+        open_eur: 0,
+        paid_eur: 0,
+        max_od: 0,
+        sum_od: 0,
+        od_count: 0,
+        open_count: 0,
+        paid_count: 0,
+        fc: {},
+      });
+    }
+    const c = byCust.get(sid);
+    const cpp = String(r['Customer Payment Process'] || '').trim().toLowerCase();
+    const isPaid = cpp === 'paid';
+    const eur = Number(r['Open Balance in EUR']) || 0;
+    const od = Number(r['System OD by Month_end']);
+    const odVal = isFinite(od) ? od : null;
+    const fcMonth = String(r['FC Month'] || r['FC month'] || '').trim() || '(未指定)';
+
+    c.docs.push({
+      doc: r['Document Number'],
+      ref: r['Ref. document number'],
+      local_amt: Number(r['Local Currency Amt']) || 0,
+      local_cur: r['Local Currency'] || '',
+      eur: eur,
+      posting: excelDateToStr(r['Posting Date']),
+      due: excelDateToStr(r['Net Due Date']),
+      od: odVal,
+      cpp: r['Customer Payment Process'] || '',
+      is_paid: isPaid,
+      contract: r['Contract Name'] || '',
+      status: r['Current Status '] || r['Current Status'] || '',
+      ar_plan: r['AR Plan '] || r['AR Plan'] || '',
+      promised: excelDateToStr(r['Promised For']),
+      fapiao: r['Fapiao/ Tax Invoice Status'] || '',
+      fc_month: fcMonth,
+    });
+
+    if (!c.fc[fcMonth]) c.fc[fcMonth] = {open_eur: 0, paid_eur: 0, open_count: 0, paid_count: 0};
+    const fcBucket = c.fc[fcMonth];
+
+    if (isPaid) {
+      c.paid_eur += eur;
+      c.paid_count += 1;
+      fcBucket.paid_eur += eur;
+      fcBucket.paid_count += 1;
+    } else {
+      c.open_eur += eur;
+      c.open_count += 1;
+      fcBucket.open_eur += eur;
+      fcBucket.open_count += 1;
+      if (odVal !== null) {
+        if (odVal > c.max_od) c.max_od = odVal;
+        c.sum_od += odVal;
+        c.od_count += 1;
+      }
+    }
+  }
+  CUSTOMERS = Array.from(byCust.values()).map(c => {
+    c.avg_od = c.od_count ? c.sum_od / c.od_count : 0;
+    c.priority = c.open_eur * (1 + Math.max(0, c.max_od) / 30);
+    c.total_count = c.open_count + c.paid_count;
+    c.paid_ratio = c.total_count ? c.paid_count / c.total_count : 0;
+    return c;
+  });
+  populateFilters();
+  render();
+}
+
+function populateFilters() {
+  const mus = [...new Set(CUSTOMERS.map(c => c.mu).filter(Boolean))].sort();
+  const cols = [...new Set(CUSTOMERS.map(c => c.collector).filter(Boolean))].sort();
+  const fcSet = new Set();
+  CUSTOMERS.forEach(c => Object.keys(c.fc).forEach(f => fcSet.add(f)));
+  const fcs = [...fcSet].sort(fcMonthCompare);
+  const muSel = document.getElementById('filterMU');
+  const colSel = document.getElementById('filterCollector');
+  const fcSel = document.getElementById('filterFC');
+  muSel.innerHTML = '<option value="">全部</option>' + mus.map(m => `<option>${m}</option>`).join('');
+  colSel.innerHTML = '<option value="">全部</option>' + cols.map(c => `<option>${c}</option>`).join('');
+  fcSel.innerHTML = '<option value="">全部</option>' + fcs.map(f => `<option>${escapeHtml(f)}</option>`).join('');
+}
+
+// Sort FC Month labels: month names ascending, special buckets last
+const FC_MONTH_ORDER = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fcMonthCompare(a, b) {
+  const parse = s => {
+    const m = String(s).match(/^([A-Za-z]{3})(?:-(.+))?$/);
+    if (!m) return [99, s];
+    const monthIdx = FC_MONTH_ORDER.indexOf(m[1]);
+    const suffix = m[2] || '';
+    // base month first, then -Risk, then other suffixes
+    const sIdx = !suffix ? 0 : suffix.toLowerCase() === 'risk' ? 1 : 2;
+    return [monthIdx >= 0 ? monthIdx : 90, sIdx, suffix];
+  };
+  const pa = parse(a), pb = parse(b);
+  for (let i = 0; i < pa.length; i++) {
+    if (pa[i] < pb[i]) return -1;
+    if (pa[i] > pb[i]) return 1;
+  }
+  return 0;
+}
+function getCurrentFCMonth() {
+  // Today is 2026-06-16 → 'Jun'. Use system month name.
+  return FC_MONTH_ORDER[new Date().getMonth()];
+}
+
+// ============== Filtering ==============
+function applyFilters(list) {
+  const mu = document.getElementById('filterMU').value;
+  const col = document.getElementById('filterCollector').value;
+  const od = document.getElementById('filterOD').value;
+  const paid = document.getElementById('filterPaid').value;
+  const fc = document.getElementById('filterFC').value;
+  const q = document.getElementById('filterSearch').value.trim().toLowerCase();
+  return list.filter(c => {
+    if (mu && c.mu !== mu) return false;
+    if (col && c.collector !== col) return false;
+    if (od && odBucket(c.max_od) !== od) return false;
+    if (paid === 'open' && c.open_count === 0) return false;
+    if (paid === 'paid' && c.open_count > 0) return false;
+    if (paid === 'partial' && (c.paid_count === 0 || c.open_count === 0)) return false;
+    if (fc && !c.fc[fc]) return false;
+    if (q) {
+      const hay = (c.name + ' ' + c.sold_to + ' ' + c.docs.map(d => d.doc + ' ' + d.ref).join(' ')).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+// ============== Render ==============
+function render() {
+  const filtered = applyFilters(CUSTOMERS);
+  filtered.sort((a, b) => {
+    const av = a[SORT_KEY], bv = b[SORT_KEY];
+    if (typeof av === 'string') {
+      return SORT_DIR === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    }
+    return SORT_DIR === 'asc' ? (av - bv) : (bv - av);
+  });
+  renderKPIs(filtered);
+  renderTable(filtered);
+  renderCharts(filtered);
+}
+
+function renderKPIs(list) {
+  const totalOpen = list.reduce((s, c) => s + c.open_eur, 0);
+  const totalPaid = list.reduce((s, c) => s + c.paid_eur, 0);
+  const over90 = list.reduce((s, c) => s + (c.max_od > 90 ? c.open_eur : 0), 0);
+  const docCount = list.reduce((s, c) => s + c.total_count, 0);
+  const top = [...list].sort((a, b) => b.priority - a.priority)[0];
+
+  document.getElementById('kpiTotalOpen').textContent = fmt(totalOpen);
+  document.getElementById('kpiTotalOpenSub').textContent = fmtFull(totalOpen) + ' EUR';
+  document.getElementById('kpiOver90').textContent = fmt(over90);
+  document.getElementById('kpiOver90Sub').textContent = totalOpen > 0 ? `占 ${(over90/totalOpen*100).toFixed(1)}%` : '—';
+  document.getElementById('kpiPaid').textContent = fmt(totalPaid);
+  const grand = totalOpen + totalPaid;
+  document.getElementById('kpiPaidSub').textContent = grand > 0 ? `回收率 ${(totalPaid/grand*100).toFixed(1)}%` : '—';
+  document.getElementById('kpiCustomers').textContent = list.length;
+  document.getElementById('kpiCustomersSub').textContent = `${docCount} 张单据`;
+  if (top) {
+    document.getElementById('kpiTopCust').textContent = top.name.length > 56 ? top.name.slice(0, 56) + '…' : top.name;
+    document.getElementById('kpiTopCustSub').textContent = `EUR ${fmt(top.open_eur)}  ·  Max OD ${top.max_od}d  ·  Priority ${fmt(top.priority)}`;
+  }
+
+  // 本月 FC 收款率
+  const curFC = getCurrentFCMonth();
+  let curOpen = 0, curPaid = 0;
+  for (const c of list) {
+    const b = c.fc[curFC];
+    if (b) { curOpen += b.open_eur; curPaid += b.paid_eur; }
+  }
+  const curTotal = curOpen + curPaid;
+  document.getElementById('kpiCurFC').textContent = curTotal > 0 ? (curPaid/curTotal*100).toFixed(1) + '%' : '—';
+  document.getElementById('kpiCurFCSub').textContent =
+    curTotal > 0 ? `${curFC}: 已付 ${fmt(curPaid)} / 共 ${fmt(curTotal)} EUR` : `${curFC}: 无数据`;
+}
+
+function renderTable(list) {
+  const tbody = document.getElementById('custTableBody');
+  if (list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:40px; color:#6b7a90;">无匹配数据</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map((c, i) => {
+    const rank = i + 1;
+    const rankClass = rank <= 3 ? 'rank-top' : rank <= 10 ? 'rank-mid' : 'rank-low';
+    const paidPct = c.total_count ? (c.paid_count / c.total_count * 100) : 0;
+    return `
+      <tr onclick="openDrawer('${c.sold_to}')" style="cursor:pointer;">
+        <td><span class="priority-rank ${rankClass}">${rank}</span></td>
+        <td>
+          <div class="cust-name">${escapeHtml(c.name)}</div>
+          <div class="cust-id">${c.sold_to}</div>
+        </td>
+        <td>${c.mu}</td>
+        <td style="font-size:12px;">${escapeHtml(c.collector)}</td>
+        <td class="amount amount-eur">${fmtFull(c.open_eur)}</td>
+        <td style="text-align:center;"><span class="od-badge ${odBadgeClass(c.max_od)}">${c.max_od}d</span></td>
+        <td style="text-align:center;">${c.avg_od.toFixed(0)}d</td>
+        <td>
+          <div class="paid-bar">
+            <div class="paid-bar-track"><div class="paid-bar-fill" style="width:${paidPct}%"></div></div>
+            <div class="paid-bar-text">${c.paid_count}/${c.total_count}</div>
+          </div>
+        </td>
+        <td class="amount priority-score">${fmt(c.priority)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+// ============== Charts ==============
+// Editorial palette
+const PAL = {
+  paper: '#f3ece0',
+  paperDeep: '#ebe2d3',
+  ink: '#1a1410',
+  inkSoft: '#3d3530',
+  inkFade: '#6b5f54',
+  rule: '#cbbfa9',
+  oxblood: '#7a1f1f',
+  oxbloodDeep: '#4f1313',
+  brass: '#a8821e',
+  brassDeep: '#6e5210',
+  inkblue: '#1f3a5f',
+  sage: '#4a6b3e',
+  sageDeep: '#2f4a25',
+  plum: '#5a2a4a',
+  hot: '#c43d2e',
+};
+// Apply editorial defaults to Chart.js once
+if (window.Chart && !window._chartDefaultsApplied) {
+  Chart.defaults.font.family = '"IBM Plex Mono", monospace';
+  Chart.defaults.font.size = 11;
+  Chart.defaults.color = PAL.inkSoft;
+  Chart.defaults.borderColor = PAL.rule;
+  window._chartDefaultsApplied = true;
+}
+
+function renderCharts(list) {
+  const buckets = ['not_overdue','0_30','30_60','60_90','90_180','180_365','365'];
+  const labels = ['≤0','1—30','31—60','61—90','91—180','181—365','>365'];
+  // Aging palette: paper-deep → brass → oxblood gradient (editorial)
+  const colors = [PAL.sageDeep, PAL.brass, '#b95c00', PAL.oxblood, PAL.oxbloodDeep, PAL.plum, PAL.ink];
+  const totals = buckets.map(() => 0);
+  for (const c of list) {
+    for (const d of c.docs) {
+      if (d.is_paid) continue;
+      const b = odBucket(d.od);
+      const idx = buckets.indexOf(b);
+      if (idx >= 0) totals[idx] += d.eur;
+    }
+  }
+  if (CHART_OD) CHART_OD.destroy();
+  CHART_OD = new Chart(document.getElementById('odChart'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data: totals, backgroundColor: colors, borderRadius: 0, borderWidth: 1, borderColor: PAL.ink }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: PAL.ink, titleColor: PAL.paper, bodyColor: PAL.paper,
+          titleFont: {family: 'IBM Plex Mono', size: 11, weight: '600'},
+          bodyFont: {family: 'Playfair Display', size: 14, weight: '700'},
+          padding: 10, cornerRadius: 0, borderColor: PAL.brass, borderWidth: 1,
+          callbacks: { label: ctx => 'EUR ' + fmtFull(ctx.parsed.y) }
+        }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: v => fmt(v), color: PAL.inkFade }, grid: { color: PAL.rule, drawBorder: false }, border: {display:false} },
+        x: { ticks: {color: PAL.inkSoft, font: {weight:'600'}}, grid: { display: false }, border: {color: PAL.ink} }
+      }
+    }
+  });
+
+  const top10 = [...list].sort((a, b) => b.open_eur - a.open_eur).slice(0, 10);
+  if (CHART_TOP) CHART_TOP.destroy();
+  CHART_TOP = new Chart(document.getElementById('topChart'), {
+    type: 'bar',
+    data: {
+      labels: top10.map(c => c.name.length > 22 ? c.name.slice(0,22) + '…' : c.name),
+      datasets: [{
+        data: top10.map(c => c.open_eur),
+        backgroundColor: top10.map(c => c.max_od > 90 ? PAL.oxbloodDeep : c.max_od > 30 ? PAL.oxblood : PAL.brass),
+        borderRadius: 0,
+        borderWidth: 1,
+        borderColor: PAL.ink,
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: PAL.ink, titleColor: PAL.paper, bodyColor: PAL.paper,
+          titleFont: {family: 'IBM Plex Mono', size: 11, weight: '600'},
+          bodyFont: {family: 'Playfair Display', size: 14, weight: '700'},
+          padding: 10, cornerRadius: 0, borderColor: PAL.brass, borderWidth: 1,
+          callbacks: {
+            label: ctx => 'EUR ' + fmtFull(ctx.parsed.x),
+            afterLabel: ctx => 'Max OD: ' + top10[ctx.dataIndex].max_od + 'd'
+          }
+        }
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { callback: v => fmt(v), color: PAL.inkFade }, grid: { color: PAL.rule, drawBorder: false }, border: {display:false} },
+        y: { ticks: {color: PAL.inkSoft}, grid: { display: false }, border: {color: PAL.ink} }
+      }
+    }
+  });
+
+  // FC Month chart - stacked bar (paid sage / open oxblood)
+  const fcAgg = {};
+  for (const c of list) {
+    for (const [m, b] of Object.entries(c.fc)) {
+      if (!fcAgg[m]) fcAgg[m] = {open: 0, paid: 0};
+      fcAgg[m].open += b.open_eur;
+      fcAgg[m].paid += b.paid_eur;
+    }
+  }
+  const fcLabels = Object.keys(fcAgg).sort(fcMonthCompare);
+  const curFC2 = getCurrentFCMonth();
+  if (CHART_FC) CHART_FC.destroy();
+  CHART_FC = new Chart(document.getElementById('fcChart'), {
+    type: 'bar',
+    data: {
+      labels: fcLabels,
+      datasets: [
+        {
+          label: 'Paid · 已付',
+          data: fcLabels.map(m => fcAgg[m].paid),
+          backgroundColor: fcLabels.map(m => m === curFC2 ? PAL.sageDeep : PAL.sage),
+          borderRadius: 0,
+          borderWidth: 1,
+          borderColor: PAL.ink,
+        },
+        {
+          label: 'Open · 未付',
+          data: fcLabels.map(m => fcAgg[m].open),
+          backgroundColor: fcLabels.map(m => m === curFC2 ? PAL.oxbloodDeep : PAL.oxblood),
+          borderRadius: 0,
+          borderWidth: 1,
+          borderColor: PAL.ink,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true, position: 'bottom',
+          labels: {
+            boxWidth: 14, boxHeight: 10, padding: 14,
+            font: {family: 'IBM Plex Mono', size: 10, weight: '600'},
+            color: PAL.inkSoft,
+          }
+        },
+        tooltip: {
+          backgroundColor: PAL.ink, titleColor: PAL.paper, bodyColor: PAL.paper,
+          titleFont: {family: 'IBM Plex Mono', size: 11, weight: '600'},
+          bodyFont: {family: 'Playfair Display', size: 13, weight: '700'},
+          padding: 10, cornerRadius: 0, borderColor: PAL.brass, borderWidth: 1,
+          callbacks: {
+            label: ctx => ctx.dataset.label + ': EUR ' + fmtFull(ctx.parsed.y),
+            afterLabel: ctx => {
+              const m = ctx.label;
+              const total = fcAgg[m].open + fcAgg[m].paid;
+              const pct = total > 0 ? (fcAgg[m].paid/total*100).toFixed(1) : '0';
+              return `Recovery · 回收率 ${pct}%`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { stacked: true, ticks: {color: PAL.inkSoft, font: {weight: '600'}}, grid: { display: false }, border: {color: PAL.ink} },
+        y: { stacked: true, beginAtZero: true, ticks: { callback: v => fmt(v), color: PAL.inkFade }, grid: { color: PAL.rule, drawBorder: false }, border: {display:false} }
+      }
+    }
+  });
+}
+
+// ============== Drawer ==============
+function openDrawer(sid) {
+  const c = CUSTOMERS.find(x => String(x.sold_to) === String(sid));
+  if (!c) return;
+  document.getElementById('drawerTitle').textContent = c.name;
+  const body = document.getElementById('drawerBody');
+  const sortedDocs = [...c.docs].sort((a, b) => (b.od || 0) - (a.od || 0));
+  body.innerHTML = `
+    <div class="drawer-section">
+      <h4>客户信息 · Subject</h4>
+      <div class="drawer-stats">
+        <div class="drawer-stat"><div class="label">Sold-to</div><div class="value" style="font-family:'IBM Plex Mono',monospace; font-size:14px; letter-spacing:0.05em;">${c.sold_to}</div></div>
+        <div class="drawer-stat"><div class="label">MU / Segment</div><div class="value" style="font-size:15px;">${c.mu} / ${c.segment || '—'}</div></div>
+        <div class="drawer-stat"><div class="label">Collector</div><div class="value" style="font-size:14px; font-style:italic;">${escapeHtml(c.collector) || '—'}</div></div>
+        <div class="drawer-stat"><div class="label">Account Exec</div><div class="value" style="font-size:14px; font-style:italic;">${escapeHtml(c.ae) || '—'}</div></div>
+      </div>
+    </div>
+    <div class="drawer-section">
+      <h4>金额汇总 (EUR) · Amounts</h4>
+      <div class="drawer-stats">
+        <div class="drawer-stat"><div class="label">Open · 未付</div><div class="value" style="color:var(--oxblood);">${fmtFull(c.open_eur)}</div></div>
+        <div class="drawer-stat"><div class="label">Paid · 已付</div><div class="value" style="color:var(--sage-deep);">${fmtFull(c.paid_eur)}</div></div>
+        <div class="drawer-stat"><div class="label">Max OD</div><div class="value">${c.max_od}<span style="font-size:13px; color:var(--ink-fade); font-weight:400;"> d</span></div></div>
+        <div class="drawer-stat"><div class="label">Priority</div><div class="value" style="color:var(--oxblood); font-style:italic;">${fmt(c.priority)}</div></div>
+      </div>
+    </div>
+    <div class="drawer-section">
+      <h4>FC Month 分布 · Forecast vs Paid</h4>
+      <table class="doc-table">
+        <thead><tr><th>FC Month</th><th style="text-align:right;">Paid · 已付</th><th style="text-align:right;">Open · 未付</th><th style="text-align:right;">Recovery</th></tr></thead>
+        <tbody>
+          ${Object.keys(c.fc).sort(fcMonthCompare).map(m => {
+            const b = c.fc[m];
+            const tot = b.open_eur + b.paid_eur;
+            const pct = tot > 0 ? (b.paid_eur/tot*100).toFixed(1) + '%' : '—';
+            const isCur = m === getCurrentFCMonth();
+            return `<tr${isCur ? ' style="background: var(--paper-deep);"' : ''}><td style="font-family:'IBM Plex Mono',monospace; font-weight:600; ${isCur ? 'color:var(--oxblood);' : ''}">${escapeHtml(m)}${isCur ? ' ◂' : ''}</td><td style="text-align:right; color:var(--sage-deep); font-family:'IBM Plex Mono',monospace;">${fmtFull(b.paid_eur)}</td><td style="text-align:right; color:var(--oxblood); font-family:'IBM Plex Mono',monospace;">${fmtFull(b.open_eur)}</td><td style="text-align:right; font-family:'Playfair Display',serif; font-style:italic; font-weight:700;">${pct}</td></tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="drawer-section">
+      <h4>单据明细 · Documents <span style="font-style:italic; font-family:'Playfair Display',serif; font-weight:700; text-transform:none; letter-spacing:0; color:var(--ink-fade);">№ ${c.docs.length}</span></h4>
+      <table class="doc-table">
+        <thead><tr><th>Doc № · 单号</th><th>Due · 到期</th><th>OD</th><th style="text-align:right;">EUR</th><th>Status</th></tr></thead>
+        <tbody>
+          ${sortedDocs.map(d => `
+            <tr>
+              <td><div style="font-family:'IBM Plex Mono',monospace; font-weight:600;">${d.doc || '—'}</div><div style="color:var(--ink-ghost); font-family:'IBM Plex Mono',monospace; font-size:10px;">${d.ref || ''}</div></td>
+              <td style="font-family:'IBM Plex Mono',monospace;">${d.due || '—'}</td>
+              <td><span class="od-badge ${odBadgeClass(d.od)}">${d.od == null ? '—' : d.od + 'd'}</span></td>
+              <td style="text-align:right; font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; font-weight:500;">${fmtFull(d.eur)}</td>
+              <td style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:${d.is_paid ? 'var(--sage-deep)' : 'var(--oxblood)'};">${d.is_paid ? '◆ Paid' : '◇ Open'}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    ${c.docs.some(d => d.status || d.ar_plan) ? `
+    <div class="drawer-section">
+      <h4>追款备注 · Notes</h4>
+      ${[...new Set(c.docs.map(d => d.status).filter(Boolean))].map(s => `<div style="font-size:13px; padding:9px 12px; border-left:3px solid var(--oxblood); background:var(--paper-deep); margin-bottom:6px; font-style:italic;"><span style="font-family:'IBM Plex Mono',monospace; font-style:normal; font-size:9px; letter-spacing:0.2em; color:var(--oxblood); text-transform:uppercase; margin-right:8px;">Status</span>${escapeHtml(s)}</div>`).join('')}
+      ${[...new Set(c.docs.map(d => d.ar_plan).filter(Boolean))].map(s => `<div style="font-size:13px; padding:9px 12px; border-left:3px solid var(--brass); background:var(--paper-deep); margin-bottom:6px; font-style:italic;"><span style="font-family:'IBM Plex Mono',monospace; font-style:normal; font-size:9px; letter-spacing:0.2em; color:var(--brass-deep); text-transform:uppercase; margin-right:8px;">AR Plan</span>${escapeHtml(s)}</div>`).join('')}
+    </div>` : ''}
+  `;
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('backdrop').classList.add('open');
+}
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('backdrop').classList.remove('open');
+}
+
+// ============== Sort & Filter wiring ==============
+document.querySelectorAll('thead th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const k = th.dataset.sort;
+    if (k === 'rank') return;
+    if (SORT_KEY === k) {
+      SORT_DIR = SORT_DIR === 'asc' ? 'desc' : 'asc';
+    } else {
+      SORT_KEY = k;
+      SORT_DIR = (k === 'name' || k === 'mu' || k === 'collector') ? 'asc' : 'desc';
+    }
+    document.querySelectorAll('thead th').forEach(t => t.classList.remove('sorted', 'asc'));
+    th.classList.add('sorted');
+    if (SORT_DIR === 'asc') th.classList.add('asc');
+    render();
+  });
+});
+
+['filterMU','filterCollector','filterOD','filterPaid','filterFC'].forEach(id => {
+  document.getElementById(id).addEventListener('change', render);
+});
+document.getElementById('filterSearch').addEventListener('input', () => {
+  clearTimeout(window._st);
+  window._st = setTimeout(render, 200);
+});
+function resetFilters() {
+  ['filterMU','filterCollector','filterOD','filterPaid','filterFC'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('filterSearch').value = '';
+  render();
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+// ============== Server-side auto-load + Sync API ==============
+const SYNC_API = `http://${location.hostname || '127.0.0.1'}:8766`;
+
+async function checkServerFile() {
+  // When served from a local http.server (the .bat launcher), surface
+  // the SharePoint sync controls if the API is reachable.
+  if (location.protocol === 'file:') return;
+  // Probe the sync API
+  let apiOk = false, status = null;
+  try {
+    const r = await fetch(`${SYNC_API}/api/status`, {cache:'no-store'});
+    if (r.ok) { status = await r.json(); apiOk = true; }
+  } catch {}
+  if (apiOk) {
+    document.getElementById('syncNowBtn').style.display = '';
+    if (!status.hasConfig) {
+      document.getElementById('fileInfo').textContent =
+        '尚未配置 SharePoint 链接 · 点 ⚙ Source 粘贴你的 Excel 链接';
+    }
+  }
+  // Try to load existing meta (already-synced file)
+  try {
+    const r = await fetch('current.meta.json', {cache: 'no-store'});
+    if (!r.ok) return;
+    const meta = await r.json();
+    const btn = document.getElementById('autoLoadBtn');
+    btn.style.display = '';
+    btn.title = `${meta.name} · 同步于 ${meta.syncedAt}`;
+    document.getElementById('fileInfo').textContent =
+      `SharePoint 最新版可拉取 · ${meta.name} · 修改于 ${(meta.lastModifiedDateTime||'').slice(0,16)}`;
+  } catch { /* no synced file yet */ }
+}
+
+async function loadFromServer() {
+  const info = document.getElementById('fileInfo');
+  info.textContent = '从 current.xlsx 加载中...';
+  try {
+    const r = await fetch('current.xlsx', {cache: 'no-store'});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const buf = await r.arrayBuffer();
+    const wb = XLSX.read(buf, {type: 'array', cellDates: true});
+    const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('master')) || 'Master Report';
+    const ws = wb.Sheets[sheetName];
+    if (!ws) throw new Error('找不到 Master Report sheet');
+    const jsonRaw = XLSX.utils.sheet_to_json(ws, {range: 1, defval: null, raw: true});
+    RAW = jsonRaw.map(row => {
+      const clean = {};
+      for (const k of Object.keys(row)) {
+        const cleanKey = String(k).replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
+        clean[cleanKey] = row[k];
+      }
+      return clean;
+    });
+    let metaName = 'current.xlsx';
+    try {
+      const m = await (await fetch('current.meta.json', {cache:'no-store'})).json();
+      metaName = m.name || metaName;
+      info.textContent = `${metaName} · ${RAW.length} 行 · SharePoint 同步于 ${m.syncedAt}`;
+    } catch { info.textContent = `${metaName} · ${RAW.length} 行`; }
+    document.getElementById('periodLabel').textContent = metaName.replace(/\.xlsx$/i, '').toUpperCase();
+    process();
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+  } catch (err) {
+    info.textContent = '从 SharePoint 拉取失败：' + err.message;
+    console.error(err);
+  }
+}
+
+// ============== Settings Modal ==============
+async function openSettings() {
+  const bd = document.getElementById('settingsBackdrop');
+  const inp = document.getElementById('settingsUrl');
+  const stat = document.getElementById('settingsStatus');
+  stat.className = 'settings-status'; stat.textContent = '';
+  // Prefill from API, else localStorage
+  let current = '';
+  try {
+    const r = await fetch(`${SYNC_API}/api/config`, {cache:'no-store'});
+    if (r.ok) current = (await r.json()).sharepoint_url || '';
+  } catch {}
+  if (!current) current = localStorage.getItem('ar_sharepoint_url') || '';
+  inp.value = current;
+  bd.classList.add('open');
+  setTimeout(() => inp.focus(), 50);
+}
+function closeSettings() {
+  document.getElementById('settingsBackdrop').classList.remove('open');
+}
+async function saveSettings() {
+  const inp = document.getElementById('settingsUrl');
+  const stat = document.getElementById('settingsStatus');
+  const url = inp.value.trim();
+  if (!url || !/^https?:\/\//i.test(url)) {
+    stat.className = 'settings-status err';
+    stat.textContent = '× 请粘贴一个完整的 https:// SharePoint 链接';
+    return;
+  }
+  stat.className = 'settings-status'; stat.textContent = '· 保存并同步中...';
+  try {
+    const r = await fetch(`${SYNC_API}/api/config`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({sharepoint_url: url}),
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    localStorage.setItem('ar_sharepoint_url', url);
+    stat.className = 'settings-status ok';
+    stat.textContent = '✓ 链接已保存，正在拉取最新数据...';
+    // Poll status until syncing finishes
+    await waitForSyncToFinish();
+    stat.textContent = '✓ 同步完成。即将载入...';
+    setTimeout(async () => {
+      closeSettings();
+      await loadFromServer();
+    }, 600);
+  } catch (err) {
+    stat.className = 'settings-status err';
+    stat.textContent = '× 保存失败：' + err.message + ' (确认 sync 服务在 :8766 运行)';
+  }
+}
+
+async function waitForSyncToFinish(maxMs = 60000) {
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    try {
+      const r = await fetch(`${SYNC_API}/api/status`, {cache:'no-store'});
+      if (r.ok) {
+        const s = await r.json();
+        if (!s.syncing && s.lastSyncAt) return s;
+      }
+    } catch {}
+    await new Promise(r => setTimeout(r, 800));
+  }
+  return null;
+}
+
+// ============== Sync Now ==============
+async function syncNow() {
+  const btn = document.getElementById('syncNowBtn');
+  const info = document.getElementById('fileInfo');
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⟳ Syncing...';
+  info.textContent = '正在向 SharePoint 拉取最新版本...';
+  try {
+    const r = await fetch(`${SYNC_API}/api/sync`, {method:'POST'});
+    if (!r.ok && r.status !== 202) throw new Error('HTTP ' + r.status);
+    const s = await waitForSyncToFinish();
+    if (s && s.lastSyncOk === false) {
+      info.textContent = '同步失败：' + (s.lastError || 'unknown');
+    } else {
+      await loadFromServer();
+    }
+  } catch (err) {
+    info.textContent = '同步触发失败：' + err.message + ' (确认 sync 服务在 :8766 运行)';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (document.getElementById('settingsBackdrop').classList.contains('open')) closeSettings();
+  }
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+  // masthead date in newspaper style
+  const d = new Date();
+  const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const td = document.getElementById('todayDate');
+  if (td) td.textContent = `${days[d.getDay()]} · ${d.getDate().toString().padStart(2,'0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  // Volume / Issue derived from year & month
+  const vol = document.getElementById('volNo');
+  const iss = document.getElementById('issueNo');
+  const roman = (n) => {
+    const map = [['M',1000],['CM',900],['D',500],['CD',400],['C',100],['XC',90],['L',50],['XL',40],['X',10],['IX',9],['V',5],['IV',4],['I',1]];
+    let r = ''; for (const [s,v] of map) { while (n>=v){r+=s;n-=v;} } return r;
+  };
+  if (vol) vol.textContent = roman(d.getFullYear() - 2020);  // arbitrary editorial volume
+  if (iss) iss.textContent = String(d.getMonth()+1).padStart(2,'0');
+  checkServerFile();
+});
+</script>
+</body>
+</html>
