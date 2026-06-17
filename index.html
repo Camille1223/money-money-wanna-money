@@ -1706,14 +1706,20 @@ function openDrawer(sid) {
   }
   const mergedDocs = [];
   for (const [key, rows] of _groups) {
-    if (rows.length === 1) { mergedDocs.push({ ...rows[0], _count: 1 }); continue; }
+    const statuses = [...new Set(rows.map(r => r.status).filter(Boolean))];
+    const arPlans = [...new Set(rows.map(r => r.ar_plan).filter(Boolean))];
+    const promised = [...new Set(rows.map(r => r.promised).filter(Boolean))];
+    if (rows.length === 1) {
+      mergedDocs.push({ ...rows[0], _count: 1, _statuses: statuses, _ar_plans: arPlans, _promised: promised });
+      continue;
+    }
     // Pick representative row = largest |EUR|
     const rep = rows.reduce((a, b) => Math.abs(b.eur || 0) > Math.abs(a.eur || 0) ? b : a);
     const sumEur = rows.reduce((s, r) => s + (r.eur || 0), 0);
     const sumLocal = rows.reduce((s, r) => s + (r.local_amt || 0), 0);
     const maxOd = rows.reduce((m, r) => Math.max(m, r.od || 0), 0);
     const allPaid = rows.every(r => r.is_paid);
-    mergedDocs.push({ ...rep, eur: sumEur, local_amt: sumLocal, od: maxOd, is_paid: allPaid, _count: rows.length });
+    mergedDocs.push({ ...rep, eur: sumEur, local_amt: sumLocal, od: maxOd, is_paid: allPaid, _count: rows.length, _statuses: statuses, _ar_plans: arPlans, _promised: promised });
   }
   const sortedDocs = mergedDocs.sort((a, b) => (b.od || 0) - (a.od || 0));
   body.innerHTML = `
@@ -1755,23 +1761,28 @@ function openDrawer(sid) {
       <table class="doc-table">
         <thead><tr><th>Ref № · 凭证号</th><th>Due · 到期</th><th>OD</th><th style="text-align:right;">EUR</th><th>Status</th></tr></thead>
         <tbody>
-          ${sortedDocs.map(d => `
-            <tr>
+          ${sortedDocs.map(d => {
+            const hasNotes = (d._statuses && d._statuses.length) || (d._ar_plans && d._ar_plans.length) || (d._promised && d._promised.length);
+            const noteRow = hasNotes ? `
+            <tr class="doc-notes-row">
+              <td colspan="5" style="padding:0 14px 12px 14px; border-top:none; background:var(--paper-deep);">
+                ${(d._statuses || []).map(s => `<div style="font-size:12px; padding:7px 11px; border-left:3px solid var(--oxblood); background:var(--paper); margin:6px 0 0 0; font-style:italic;"><span style="font-family:'IBM Plex Mono',monospace; font-style:normal; font-size:9px; letter-spacing:0.2em; color:var(--oxblood); text-transform:uppercase; margin-right:8px;">Status</span>${escapeHtml(s)}</div>`).join('')}
+                ${(d._ar_plans || []).map(s => `<div style="font-size:12px; padding:7px 11px; border-left:3px solid var(--brass); background:var(--paper); margin:6px 0 0 0; font-style:italic;"><span style="font-family:'IBM Plex Mono',monospace; font-style:normal; font-size:9px; letter-spacing:0.2em; color:var(--brass-deep); text-transform:uppercase; margin-right:8px;">AR Plan</span>${escapeHtml(s)}</div>`).join('')}
+                ${(d._promised || []).map(s => `<div style="font-size:12px; padding:7px 11px; border-left:3px solid var(--sage-deep); background:var(--paper); margin:6px 0 0 0; font-style:italic;"><span style="font-family:'IBM Plex Mono',monospace; font-style:normal; font-size:9px; letter-spacing:0.2em; color:var(--sage-deep); text-transform:uppercase; margin-right:8px;">Promised</span>${escapeHtml(s)}</div>`).join('')}
+              </td>
+            </tr>` : '';
+            return `
+            <tr${hasNotes ? ' style="border-bottom:none;"' : ''}>
               <td><div style="font-family:'IBM Plex Mono',monospace; font-weight:600;">${d.ref || d.doc || '—'}</div>${d._count > 1 ? `<div style="color:var(--ink-ghost); font-family:'IBM Plex Mono',monospace; font-size:10px;">⊕ ${d._count} lines</div>` : ''}</td>
               <td style="font-family:'IBM Plex Mono',monospace;">${d.due || '—'}</td>
               <td><span class="od-badge ${odBadgeClass(d.od)}">${d.od == null ? '—' : d.od + 'd'}</span></td>
               <td style="text-align:right; font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; font-weight:500;">${fmtFull(d.eur)}</td>
               <td style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:${d.is_paid ? 'var(--sage-deep)' : 'var(--oxblood)'};">${d.is_paid ? '◆ Paid' : '◇ Open'}</td>
-            </tr>`).join('')}
+            </tr>${noteRow}`;
+          }).join('')}
         </tbody>
       </table>
     </div>
-    ${c.docs.some(d => d.status || d.ar_plan) ? `
-    <div class="drawer-section">
-      <h4>追款备注 · Notes</h4>
-      ${[...new Set(c.docs.map(d => d.status).filter(Boolean))].map(s => `<div style="font-size:13px; padding:9px 12px; border-left:3px solid var(--oxblood); background:var(--paper-deep); margin-bottom:6px; font-style:italic;"><span style="font-family:'IBM Plex Mono',monospace; font-style:normal; font-size:9px; letter-spacing:0.2em; color:var(--oxblood); text-transform:uppercase; margin-right:8px;">Status</span>${escapeHtml(s)}</div>`).join('')}
-      ${[...new Set(c.docs.map(d => d.ar_plan).filter(Boolean))].map(s => `<div style="font-size:13px; padding:9px 12px; border-left:3px solid var(--brass); background:var(--paper-deep); margin-bottom:6px; font-style:italic;"><span style="font-family:'IBM Plex Mono',monospace; font-style:normal; font-size:9px; letter-spacing:0.2em; color:var(--brass-deep); text-transform:uppercase; margin-right:8px;">AR Plan</span>${escapeHtml(s)}</div>`).join('')}
-    </div>` : ''}
   `;
   document.getElementById('drawer').classList.add('open');
   document.getElementById('backdrop').classList.add('open');
