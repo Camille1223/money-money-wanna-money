@@ -1696,7 +1696,26 @@ function openDrawer(sid) {
   if (!c) return;
   document.getElementById('drawerTitle').textContent = c.name;
   const body = document.getElementById('drawerBody');
-  const sortedDocs = [...c.docs].sort((a, b) => (b.od || 0) - (a.od || 0));
+  // Merge by Ref. document number — same ref = one row, EUR summed.
+  // Empty ref stays as its own row (keyed by doc to avoid collapsing distinct rows).
+  const _groups = new Map();
+  for (const d of c.docs) {
+    const key = (d.ref && String(d.ref).trim()) ? `R:${d.ref}` : `D:${d.doc || Math.random()}`;
+    if (!_groups.has(key)) _groups.set(key, []);
+    _groups.get(key).push(d);
+  }
+  const mergedDocs = [];
+  for (const [key, rows] of _groups) {
+    if (rows.length === 1) { mergedDocs.push({ ...rows[0], _count: 1 }); continue; }
+    // Pick representative row = largest |EUR|
+    const rep = rows.reduce((a, b) => Math.abs(b.eur || 0) > Math.abs(a.eur || 0) ? b : a);
+    const sumEur = rows.reduce((s, r) => s + (r.eur || 0), 0);
+    const sumLocal = rows.reduce((s, r) => s + (r.local_amt || 0), 0);
+    const maxOd = rows.reduce((m, r) => Math.max(m, r.od || 0), 0);
+    const allPaid = rows.every(r => r.is_paid);
+    mergedDocs.push({ ...rep, eur: sumEur, local_amt: sumLocal, od: maxOd, is_paid: allPaid, _count: rows.length });
+  }
+  const sortedDocs = mergedDocs.sort((a, b) => (b.od || 0) - (a.od || 0));
   body.innerHTML = `
     <div class="drawer-section">
       <h4>客户信息 · Subject</h4>
@@ -1732,13 +1751,13 @@ function openDrawer(sid) {
       </table>
     </div>
     <div class="drawer-section">
-      <h4>单据明细 · Documents <span style="font-style:italic; font-family:'Playfair Display',serif; font-weight:700; text-transform:none; letter-spacing:0; color:var(--ink-fade);">№ ${c.docs.length}</span></h4>
+      <h4>单据明细 · Documents <span style="font-style:italic; font-family:'Playfair Display',serif; font-weight:700; text-transform:none; letter-spacing:0; color:var(--ink-fade);">№ ${sortedDocs.length}</span></h4>
       <table class="doc-table">
-        <thead><tr><th>Doc № · 单号</th><th>Due · 到期</th><th>OD</th><th style="text-align:right;">EUR</th><th>Status</th></tr></thead>
+        <thead><tr><th>Ref № · 凭证号</th><th>Due · 到期</th><th>OD</th><th style="text-align:right;">EUR</th><th>Status</th></tr></thead>
         <tbody>
           ${sortedDocs.map(d => `
             <tr>
-              <td><div style="font-family:'IBM Plex Mono',monospace; font-weight:600;">${d.doc || '—'}</div><div style="color:var(--ink-ghost); font-family:'IBM Plex Mono',monospace; font-size:10px;">${d.ref || ''}</div></td>
+              <td><div style="font-family:'IBM Plex Mono',monospace; font-weight:600;">${d.ref || d.doc || '—'}</div>${d._count > 1 ? `<div style="color:var(--ink-ghost); font-family:'IBM Plex Mono',monospace; font-size:10px;">⊕ ${d._count} lines</div>` : ''}</td>
               <td style="font-family:'IBM Plex Mono',monospace;">${d.due || '—'}</td>
               <td><span class="od-badge ${odBadgeClass(d.od)}">${d.od == null ? '—' : d.od + 'd'}</span></td>
               <td style="text-align:right; font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; font-weight:500;">${fmtFull(d.eur)}</td>
