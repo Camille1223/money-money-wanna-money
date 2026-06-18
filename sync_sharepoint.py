@@ -35,7 +35,7 @@ META_PATH = HERE / 'current.meta.json'
 CONFIG_PATH = HERE / 'config.json'
 
 API_PORT = 8766
-POLL_SECONDS = 600  # 10 minutes
+POLL_SECONDS = 60  # every minute — near-real-time
 
 LOG = lambda msg: print(f'[{datetime.now().strftime("%H:%M:%S")}] {msg}', flush=True)
 
@@ -303,7 +303,7 @@ def serve_api():
 
 
 def main():
-    LOG(f'AR Dashboard sync starting. Polling every {POLL_SECONDS}s.')
+    LOG(f'AR Dashboard sync starting. Polling every {POLL_SECONDS}s (~real-time).')
     LOG(f'Output: {OUT_PATH}')
     LOG(f'Config: {CONFIG_PATH}')
 

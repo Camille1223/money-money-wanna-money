@@ -1,22 +1,45 @@
 @echo off
-REM === AR Dashboard Launcher ===
-REM Starts a local Python web server in the dashboard folder and opens the browser.
-REM Closing the black console window will stop the server.
+REM ============================================================
+REM AR Dashboard launcher — robust edition
+REM   - Kills any leftover instances on ports 8765/8766 first
+REM   - Logs both static server + sync to .log files
+REM   - Triggers an immediate sync on startup (no 10-min wait)
+REM ============================================================
 
 cd /d "%~dp0"
 
-REM Pick an unlikely-to-be-used port
-set PORT=8765
+set STATIC_PORT=8765
+set SYNC_PORT=8766
 
-REM Open the dashboard in the default browser after a short delay
-start "" cmd /c "ping 127.0.0.1 -n 2 >nul && start http://localhost:%PORT%/index.html"
+echo [AR Dashboard] Reaping any leftover instances on %STATIC_PORT% / %SYNC_PORT% ...
 
-REM Run the auto-sync backend if auth is available; otherwise just serve files.
-if exist sync_sharepoint.py (
-  echo [AR Dashboard] Starting SharePoint auto-sync backend...
-  start "AR Sync" /min cmd /c "set PYTHONIOENCODING=utf-8 && python sync_sharepoint.py"
+REM Kill anything listening on either port (idempotent — silent if nothing to kill)
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":%STATIC_PORT% " ^| findstr LISTENING') do (
+  taskkill /F /PID %%P >nul 2>&1
+)
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":%SYNC_PORT% " ^| findstr LISTENING') do (
+  taskkill /F /PID %%P >nul 2>&1
 )
 
-echo [AR Dashboard] Serving on http://localhost:%PORT%/
-echo Close this window to stop the server.
-python -m http.server %PORT%
+REM Brief pause so the kernel actually releases the sockets
+ping 127.0.0.1 -n 2 >nul
+
+REM ----- Sync backend (port 8766) ------------------------------
+if exist sync_sharepoint.py (
+  echo [AR Dashboard] Starting SharePoint sync backend ^(port %SYNC_PORT%^)...
+  REM Visible window so users can see progress; logs also tee'd to sync.log
+  start "AR Sync" cmd /c "set PYTHONIOENCODING=utf-8 && python -u sync_sharepoint.py > sync.log 2>&1"
+)
+
+REM ----- Open browser after a short delay -----------------------
+start "" cmd /c "ping 127.0.0.1 -n 3 >nul && start http://localhost:%STATIC_PORT%/index.html"
+
+REM ----- Trigger an immediate sync once the backend is up -------
+start "" cmd /c "ping 127.0.0.1 -n 5 >nul && curl -s -X POST http://127.0.0.1:%SYNC_PORT%/api/sync >nul 2>&1"
+
+echo.
+echo [AR Dashboard] Static server: http://localhost:%STATIC_PORT%/
+echo [AR Dashboard] Close this window to stop the dashboard.
+echo.
+
+python -u -m http.server %STATIC_PORT% > server.log 2>&1

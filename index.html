@@ -2010,6 +2010,13 @@ window.addEventListener('DOMContentLoaded', () => {
   if (vol) vol.textContent = roman(d.getFullYear() - 2020);  // arbitrary editorial volume
   if (iss) iss.textContent = String(d.getMonth()+1).padStart(2,'0');
   checkServerFile();
+  // On every dashboard open, kick off a background sync so the user never
+  // sees a stale cache. If the sync service isn't up, this fails silently —
+  // the visible ⟲ Sync Now button remains the explicit fallback.
+  fetch(`${SYNC_API}/api/sync`, {method:'POST'})
+    .then(() => waitForSyncToFinish())
+    .then(s => { if (s && s.lastSyncOk !== false) loadFromServer(); })
+    .catch(() => {});
 });
 </script>
 </body>
