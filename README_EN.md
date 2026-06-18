@@ -94,7 +94,7 @@ The link is saved in a local `config.json` and re-used on next launch.
 - **⌘ Load / Refresh Excel** — pick an `.xlsx` from your machine manually (bypasses SharePoint)
 - **⚙ Source** — change the SharePoint link (e.g. when the month rolls over)
 
-The background sync service auto-pulls every 10 minutes. Closing the browser is fine; the dashboard only stops when you close the bat command window.
+The background sync service auto-pulls every minute. Closing the browser is fine; the dashboard only stops when you close the bat command window.
 
 ### When the month changes (start of each month)
 The SharePoint folder name flips from `202606` to `202607`, and the file name changes too.
@@ -104,7 +104,7 @@ The SharePoint folder name flips from `202606` to `202607`, and the file name ch
 
 ## 5 · Key metrics
 
-- **Priority** = `Open EUR × (1 + OD days / 30)` — combined weight of amount and overdue severity
+- **Priority** = `Open EUR × (1 + OD days / 30)` — combined weight of amount and overdue severity. [Full breakdown of why this formula →](./PRIORITY.md)
 - **FC Recovery** = current FC Month received / total billed
 - **Max OD** = the largest overdue-day count among that customer's open invoices
 

@@ -38,11 +38,11 @@ AR collectors at SAP who want a faster way to triage their book without uploadin
 3. Browser parses the Excel and renders KPIs / charts / tables — entirely client-side
 
 ### Key features
-- 🎯 **Priority score** — `Open EUR × (1 + OD/30)`
+- 🎯 **Priority score** — `Open EUR × (1 + OD/30)` · [why this formula →](./PRIORITY.md)
 - 📊 **FC Month recovery** — billed vs received per forecast month
 - 📁 **Customer dossier** — open / paid invoice detail, merged by `Ref. document number`
 - 📝 **Inline notes** — Status / AR Plan / Promised dates beneath each ref
-- ⏱ **Auto-sync** — every 10 min in background
+- ⏱ **Auto-sync** — every minute in background
 - 🎨 **Editorial aesthetic** — Playfair Display + IBM Plex Mono, no chart noise
 
 ### Quick start
@@ -72,11 +72,11 @@ SAP 内部 AR collector，想要一个不用上传任何数据、快速 triage �
 3. 浏览器解析 Excel，渲染 KPI / 图表 / 表格 — 全部客户端运行
 
 ### 核心功能
-- 🎯 **优先级评分** — `Open EUR × (1 + OD/30)`
+- 🎯 **优先级评分** — `Open EUR × (1 + OD/30)` · [公式解读 →](./PRIORITY.md)
 - 📊 **FC Month 收款率** — 每个预测月的开单 vs 收款
 - 📁 **客户 dossier** — 未付/已付单据明细，按 `Ref. document number` 合并
 - 📝 **内联备注** — Status / AR Plan / Promised 日期挂在每条 ref 下方
-- ⏱ **自动同步** — 后台每 10 分钟拉一次
+- ⏱ **自动同步** — 后台每分钟拉一次
 - 🎨 **editorial 美学** — Playfair Display + IBM Plex Mono，去除图表噪声
 
 ### 快速开始
