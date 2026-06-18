@@ -968,6 +968,73 @@ tbody td {
   .chart-card { border-right: none; border-bottom: 1px solid var(--rule); }
   .drawer { width: 100%; border-left: none; }
 }
+
+/* ============== Hover tooltips for ratios ==============
+   Bilingual editorial-style explainer; appears on hover, gone on leave.
+   Usage: <span class="has-tip" data-tip-en="..." data-tip-cn="...">label</span> */
+.has-tip {
+  position: relative;
+  cursor: help;
+  border-bottom: 1px dotted currentColor;
+  padding-bottom: 1px;
+}
+.has-tip::after,
+.has-tip::before {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%) translateY(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease;
+  z-index: 1000;
+}
+.has-tip::after {
+  content: attr(data-tip-en) "\A\A" attr(data-tip-cn);
+  white-space: pre-line;
+  width: max-content;
+  max-width: 320px;
+  padding: 12px 14px;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-style: italic;
+  font-size: 12px;
+  line-height: 1.55;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  text-align: left;
+  border: 1px solid var(--ink);
+  box-shadow: 0 8px 24px rgba(28, 27, 26, 0.25);
+}
+.has-tip::before {
+  content: '';
+  bottom: calc(100% + 4px);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid var(--ink);
+}
+.has-tip:hover::after,
+.has-tip:hover::before,
+.has-tip:focus::after,
+.has-tip:focus::before {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+/* When tip lives inside a header / table cell, keep it tidy */
+th .has-tip { font-weight: inherit; letter-spacing: inherit; }
+.kpi-label .has-tip { border-bottom-color: rgba(255,255,255,0.35); }
+/* Edge cases — tip near right edge gets pulled left, near top gets flipped below */
+.has-tip[data-tip-pos="left"]::after { left: 0; transform: translateX(0) translateY(4px); }
+.has-tip[data-tip-pos="left"]:hover::after { transform: translateX(0) translateY(0); }
+.has-tip[data-tip-pos="left"]::before { left: 12px; transform: translateX(0) translateY(4px); }
+.has-tip[data-tip-pos="left"]:hover::before { transform: translateX(0) translateY(0); }
+.has-tip[data-tip-pos="right"]::after { left: auto; right: 0; transform: translateX(0) translateY(4px); }
+.has-tip[data-tip-pos="right"]:hover::after { transform: translateX(0) translateY(0); }
+.has-tip[data-tip-pos="right"]::before { left: auto; right: 12px; transform: translateX(0) translateY(4px); }
+.has-tip[data-tip-pos="right"]:hover::before { transform: translateX(0) translateY(0); }
 </style>
 </head>
 <body>
@@ -1048,27 +1115,27 @@ tbody td {
 <!-- Front-page KPI block -->
 <div class="front-page">
   <div class="kpi headline danger">
-    <div class="kpi-label">Open Balance · 未付总额 · EUR</div>
+    <div class="kpi-label"><span class="has-tip" data-tip-pos="left" data-tip-en="Sum of all unpaid invoice amounts in EUR across every customer in your book." data-tip-cn="所有客户全部未付单据的欧元合计 — 你 book 里此刻还没收回的钱。">Open Balance · 未付总额 · EUR</span></div>
     <div class="kpi-value" id="kpiTotalOpen">—</div>
     <div class="kpi-sub" id="kpiTotalOpenSub">—</div>
   </div>
   <div class="kpi danger">
-    <div class="kpi-label">Past 90d · 逾期 &gt;90 天</div>
+    <div class="kpi-label"><span class="has-tip" data-tip-en="Open invoices whose due date is more than 90 days past — the riskiest slice of your portfolio." data-tip-cn="到期日已经过去超过 90 天的未付单据 — 组合中风险最高的部分。">Past 90d · 逾期 &gt;90 天</span></div>
     <div class="kpi-value" id="kpiOver90">—</div>
     <div class="kpi-sub" id="kpiOver90Sub">—</div>
   </div>
   <div class="kpi ok">
-    <div class="kpi-label">Collected · 已收款 EUR</div>
+    <div class="kpi-label"><span class="has-tip" data-tip-en="EUR already received from customers across all FC months — actual cash collected." data-tip-cn="所有 FC Month 累计已收到的欧元 — 实际入账的现金。">Collected · 已收款 EUR</span></div>
     <div class="kpi-value" id="kpiPaid">—</div>
     <div class="kpi-sub" id="kpiPaidSub">—</div>
   </div>
   <div class="kpi info">
-    <div class="kpi-label">Customers · 客户 · Docs</div>
+    <div class="kpi-label"><span class="has-tip" data-tip-en="Customer count with open balance · total open document line count — how concentrated your work is." data-tip-cn="还有未付余额的客户数 · 总开放单据行数 — 用来判断 book 的集中度。">Customers · 客户 · Docs</span></div>
     <div class="kpi-value" id="kpiCustomers">—</div>
     <div class="kpi-sub" id="kpiCustomersSub">—</div>
   </div>
   <div class="kpi warn">
-    <div class="kpi-label">FC Recovery · 本月 FC 收款率</div>
+    <div class="kpi-label"><span class="has-tip" data-tip-pos="right" data-tip-en="For the current Forecast Month: paid EUR ÷ (paid + open) EUR. How much of what was forecast to come in this month has actually arrived." data-tip-cn="当前 FC Month 的：已收款 EUR ÷ (已收款 + 未付) EUR。本月预测要收的钱，目前到账了多少。">FC Recovery · 本月 FC 收款率</span></div>
     <div class="kpi-value" id="kpiCurFC">—</div>
     <div class="kpi-sub" id="kpiCurFCSub">—</div>
   </div>
@@ -1166,11 +1233,11 @@ tbody td {
           <th data-sort="name">Account · 客户</th>
           <th data-sort="mu" style="width:80px;">MU</th>
           <th data-sort="collector" style="width:150px;">Collector</th>
-          <th data-sort="open_eur" style="text-align:right;">Open EUR</th>
-          <th data-sort="max_od" style="text-align:center; width:90px;">Max OD</th>
-          <th data-sort="avg_od" style="text-align:center; width:80px;">Avg OD</th>
-          <th data-sort="paid_ratio" style="width:170px;">Paid / Open</th>
-          <th data-sort="priority" class="sorted" style="text-align:right; width:130px;">Priority</th>
+          <th data-sort="open_eur" style="text-align:right;"><span class="has-tip" data-tip-en="Total unpaid invoice amount for this customer in EUR." data-tip-cn="该客户所有未付单据的欧元合计。">Open EUR</span></th>
+          <th data-sort="max_od" style="text-align:center; width:90px;"><span class="has-tip" data-tip-en="Largest overdue-day count among this customer's open invoices — your worst-aged exposure with them." data-tip-cn="该客户所有未付单据中最大的逾期天数 — 与该客户之间最老的一笔账。">Max OD</span></th>
+          <th data-sort="avg_od" style="text-align:center; width:80px;"><span class="has-tip" data-tip-en="Average overdue-day count across this customer's open invoices, weighted by line." data-tip-cn="该客户未付单据的平均逾期天数（按单据数等权）。">Avg OD</span></th>
+          <th data-sort="paid_ratio" style="width:170px;"><span class="has-tip" data-tip-en="Paid EUR ÷ (Paid + Open) EUR for this customer — share of their total billing already received." data-tip-cn="该客户的：已付 EUR ÷ (已付 + 未付) EUR — 已收回部分占总开单的比例。">Paid / Open</span></th>
+          <th data-sort="priority" class="sorted" style="text-align:right; width:130px;"><span class="has-tip" data-tip-pos="right" data-tip-en="Open EUR × (1 + Max OD / 30). Bigger amount and longer overdue both raise priority — who to call first today." data-tip-cn="未付 EUR × (1 + Max OD / 30)。金额越大、逾期越久优先级越高 — 决定今天该先打谁电话。">Priority</span></th>
         </tr>
       </thead>
       <tbody id="custTableBody"></tbody>
@@ -1735,16 +1802,16 @@ function openDrawer(sid) {
     <div class="drawer-section">
       <h4>金额汇总 (EUR) · Amounts</h4>
       <div class="drawer-stats">
-        <div class="drawer-stat"><div class="label">Open · 未付</div><div class="value" style="color:var(--oxblood);">${fmtFull(c.open_eur)}</div></div>
-        <div class="drawer-stat"><div class="label">Paid · 已付</div><div class="value" style="color:var(--sage-deep);">${fmtFull(c.paid_eur)}</div></div>
-        <div class="drawer-stat"><div class="label">Max OD</div><div class="value">${c.max_od}<span style="font-size:13px; color:var(--ink-fade); font-weight:400;"> d</span></div></div>
-        <div class="drawer-stat"><div class="label">Priority</div><div class="value" style="color:var(--oxblood); font-style:italic;">${fmt(c.priority)}</div></div>
+        <div class="drawer-stat"><div class="label"><span class="has-tip" data-tip-en="Total unpaid amount for this customer in EUR." data-tip-cn="该客户所有未付单据的欧元合计。">Open · 未付</span></div><div class="value" style="color:var(--oxblood);">${fmtFull(c.open_eur)}</div></div>
+        <div class="drawer-stat"><div class="label"><span class="has-tip" data-tip-en="EUR already received from this customer." data-tip-cn="该客户已收到的欧元金额。">Paid · 已付</span></div><div class="value" style="color:var(--sage-deep);">${fmtFull(c.paid_eur)}</div></div>
+        <div class="drawer-stat"><div class="label"><span class="has-tip" data-tip-en="Largest overdue-day count among this customer's open invoices." data-tip-cn="该客户未付单据中最大的逾期天数。">Max OD</span></div><div class="value">${c.max_od}<span style="font-size:13px; color:var(--ink-fade); font-weight:400;"> d</span></div></div>
+        <div class="drawer-stat"><div class="label"><span class="has-tip" data-tip-pos="right" data-tip-en="Open EUR × (1 + Max OD / 30). Higher = more urgent to chase." data-tip-cn="未付 EUR × (1 + Max OD / 30)。越高越该优先追。">Priority</span></div><div class="value" style="color:var(--oxblood); font-style:italic;">${fmt(c.priority)}</div></div>
       </div>
     </div>
     <div class="drawer-section">
       <h4>FC Month 分布 · Forecast vs Paid</h4>
       <table class="doc-table">
-        <thead><tr><th>FC Month</th><th style="text-align:right;">Paid · 已付</th><th style="text-align:right;">Open · 未付</th><th style="text-align:right;">Recovery</th></tr></thead>
+        <thead><tr><th>FC Month</th><th style="text-align:right;">Paid · 已付</th><th style="text-align:right;">Open · 未付</th><th style="text-align:right;"><span class="has-tip" data-tip-pos="right" data-tip-en="Paid ÷ (Paid + Open) for this FC month — share of that month's billing already collected." data-tip-cn="该 FC Month 的：已付 ÷ (已付 + 未付) — 当月开单已收回的比例。">Recovery</span></th></tr></thead>
         <tbody>
           ${Object.keys(c.fc).sort(fcMonthCompare).map(m => {
             const b = c.fc[m];
