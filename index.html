@@ -985,8 +985,8 @@ tbody td {
 .has-tip::before {
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 10px);
-  transform: translateX(-50%) translateY(4px);
+  top: calc(100% + 10px);
+  transform: translateX(-50%) translateY(-4px);
   opacity: 0;
   pointer-events: none;
   transition: opacity 140ms ease, transform 140ms ease;
@@ -1012,12 +1012,12 @@ tbody td {
 }
 .has-tip::before {
   content: '';
-  bottom: calc(100% + 4px);
+  top: calc(100% + 4px);
   width: 0;
   height: 0;
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
-  border-top: 6px solid var(--ink);
+  border-bottom: 6px solid var(--ink);
 }
 .has-tip:hover::after,
 .has-tip:hover::before,
@@ -1030,13 +1030,13 @@ tbody td {
 th .has-tip { font-weight: inherit; letter-spacing: inherit; }
 .kpi-label .has-tip { border-bottom-color: rgba(255,255,255,0.35); }
 /* Edge cases — tip near right edge gets pulled left, near top gets flipped below */
-.has-tip[data-tip-pos="left"]::after { left: 0; transform: translateX(0) translateY(4px); }
+.has-tip[data-tip-pos="left"]::after { left: 0; transform: translateX(0) translateY(-4px); }
 .has-tip[data-tip-pos="left"]:hover::after { transform: translateX(0) translateY(0); }
-.has-tip[data-tip-pos="left"]::before { left: 12px; transform: translateX(0) translateY(4px); }
+.has-tip[data-tip-pos="left"]::before { left: 12px; transform: translateX(0) translateY(-4px); }
 .has-tip[data-tip-pos="left"]:hover::before { transform: translateX(0) translateY(0); }
-.has-tip[data-tip-pos="right"]::after { left: auto; right: 0; transform: translateX(0) translateY(4px); }
+.has-tip[data-tip-pos="right"]::after { left: auto; right: 0; transform: translateX(0) translateY(-4px); }
 .has-tip[data-tip-pos="right"]:hover::after { transform: translateX(0) translateY(0); }
-.has-tip[data-tip-pos="right"]::before { left: auto; right: 12px; transform: translateX(0) translateY(4px); }
+.has-tip[data-tip-pos="right"]::before { left: auto; right: 12px; transform: translateX(0) translateY(-4px); }
 .has-tip[data-tip-pos="right"]:hover::before { transform: translateX(0) translateY(0); }
 </style>
 </head>
