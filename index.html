@@ -142,6 +142,9 @@ body::after {
   padding: 0 4px;
 }
 .dateline .pull { color: var(--oxblood); font-weight: 600; }
+.sync-fresh { color: var(--ink-ghost); }
+.sync-stale { color: var(--oxblood); font-weight: 600; }
+.sync-stale::before { content: "● "; color: var(--oxblood); }
 
 /* Toolbar / actions */
 .toolbar {
@@ -1064,6 +1067,7 @@ th .has-tip { font-weight: inherit; letter-spacing: inherit; }
   <span>Daily — 商务机密 · For Internal Use</span>
   <span class="pull">「逾期 即 失礼」</span>
   <span id="fileInfo">File: not yet loaded</span>
+  <span id="syncFreshness" class="sync-fresh" title="">· last sync —</span>
 </div>
 
 <div class="toolbar" style="justify-content:flex-end; margin-bottom: 22px;">
@@ -2087,7 +2091,36 @@ window.addEventListener('DOMContentLoaded', () => {
     .then(() => waitForSyncToFinish())
     .then(s => { if (s && s.lastSyncOk !== false) loadFromServer(); })
     .catch(() => {});
+  updateSyncFreshness();
+  setInterval(updateSyncFreshness, 30000);
 });
+
+async function updateSyncFreshness() {
+  const el = document.getElementById('syncFreshness');
+  if (!el) return;
+  let status = null;
+  try {
+    const r = await fetch(`${SYNC_API}/api/status`, {cache:'no-store'});
+    if (r.ok) status = await r.json();
+  } catch {}
+  if (!status || !status.lastSyncAt) {
+    el.className = 'sync-stale';
+    el.textContent = '· sync offline · 同步未运行';
+    el.title = 'Sync backend unreachable — restart launcher / 重新打开桌面快捷方式';
+    return;
+  }
+  const ageMs = Date.now() - new Date(status.lastSyncAt).getTime();
+  const mins = Math.floor(ageMs / 60000);
+  if (mins >= 10) {
+    el.className = 'sync-stale';
+    el.textContent = `· stale · ${mins}m ago`;
+    el.title = `Last sync ${mins} min ago — token may have expired / token 可能过期，重启快捷方式`;
+  } else {
+    el.className = 'sync-fresh';
+    el.textContent = `· synced ${mins}m ago`;
+    el.title = `Last sync at ${status.lastSyncAt}`;
+  }
+}
 </script>
 </body>
 </html>
