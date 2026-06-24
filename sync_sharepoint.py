@@ -65,8 +65,87 @@ def save_config(cfg):
     CONFIG_PATH.write_text(json.dumps(cfg, indent=2), encoding='utf-8')
 
 
+def _refresh_graph_token(prov_name, prov):
+    """Use the provider's stored MSAL refresh token to mint a fresh Graph access
+    token. Writes the new access token AND rotated refresh token back into
+    auth.json so the next call also succeeds. Returns the new access token or
+    None on failure.
+
+    This is what keeps the dashboard alive without nagging the user to "run a
+    Teams/Outlook MCP tool" every few hours — the refresh token lives ~90 days
+    and gets rotated on every use.
+    """
+    rt_obj = prov.get('refreshToken')
+    if not isinstance(rt_obj, dict):
+        return None
+    rt = rt_obj.get('secret')
+    client_id = rt_obj.get('clientId')
+    if not rt or not client_id:
+        return None
+    body = urllib.parse.urlencode({
+        'client_id': client_id,
+        'grant_type': 'refresh_token',
+        'refresh_token': rt,
+        'scope': 'https://graph.microsoft.com/.default offline_access',
+    }).encode()
+    req = urllib.request.Request(
+        'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+        data=body,
+        headers={
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Origin': f'https://{prov_name}',
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read())
+    except Exception as e:
+        LOG(f'refresh_token exchange for {prov_name} failed: {e}')
+        return None
+    new_access = result.get('access_token')
+    if not new_access:
+        return None
+    expires_in = int(result.get('expires_in', 3600))
+    new_exp = int(time.time()) + expires_in
+    # Persist new tokens back into auth.json (atomically — write to tmp then replace)
+    try:
+        with open(AUTH_PATH, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        target = data.get('providers', {}).get(prov_name, {})
+        # Update the Graph token in the tokens array
+        updated = False
+        for t in target.get('tokens', []):
+            if t.get('audience') == 'https://graph.microsoft.com':
+                t['token'] = new_access
+                t['expiresAt'] = new_exp
+                updated = True
+                break
+        if not updated:
+            target.setdefault('tokens', []).append({
+                'token': new_access,
+                'audience': 'https://graph.microsoft.com',
+                'expiresAt': new_exp,
+                'scopes': ['https://graph.microsoft.com/.default'],
+            })
+        # Rotate refresh token (Azure issues a new one on every refresh)
+        if 'refresh_token' in result:
+            rt_obj['secret'] = result['refresh_token']
+            target['refreshToken'] = rt_obj
+        tmp = AUTH_PATH.with_suffix('.json.tmp')
+        tmp.write_text(json.dumps(data, indent=2), encoding='utf-8')
+        tmp.replace(AUTH_PATH)
+        LOG(f'Refreshed Graph token via {prov_name} ({expires_in}s, persisted)')
+    except Exception as e:
+        # Even if persistence fails, we can still return the access token for
+        # this call — the next sync will just refresh again.
+        LOG(f'refresh ok but persisting to auth.json failed: {e}')
+    return new_access
+
+
 def get_graph_token():
-    """Read the most recent valid Graph token from auth.json."""
+    """Read the most recent valid Graph token from auth.json. If all are
+    expired, attempt to refresh using a stored MSAL refresh token before
+    giving up."""
     if not AUTH_PATH.exists():
         LOG(f'auth.json not found at {AUTH_PATH} - run any Teams/Outlook MCP tool to sign in.')
         return None
@@ -86,7 +165,15 @@ def get_graph_token():
                     continue
                 LOG(f'Using Graph token from {prov_name} ({remaining}s remaining)')
                 return t['token']
-    LOG('No valid Graph token in auth.json - run any Teams/Outlook MCP tool to refresh.')
+    # All cached tokens stale — try refresh_token grant on each provider
+    for prov_name in ('teams.microsoft.com', 'teams.cloud.microsoft'):
+        prov = providers.get(prov_name)
+        if not prov:
+            continue
+        tok = _refresh_graph_token(prov_name, prov)
+        if tok:
+            return tok
+    LOG('No valid Graph token and refresh failed - run any Teams/Outlook MCP tool to re-sign in.')
     return None
 
 
