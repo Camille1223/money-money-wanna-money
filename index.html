@@ -2021,19 +2021,43 @@ async function saveSettings() {
   }
 }
 
-async function waitForSyncToFinish(maxMs = 60000) {
+async function waitForSyncToFinish(maxMs = 60000, baselineSyncAt = undefined) {
+  // baselineSyncAt = the lastSyncAt value BEFORE we triggered a new sync.
+  //   We wait until the backend reports a syncAt strictly newer than that —
+  //   otherwise we can race a previous sync that finished a moment ago and
+  //   serve its (now stale) output. Pass undefined to use the legacy
+  //   behavior (any completed sync counts).
   const start = Date.now();
   while (Date.now() - start < maxMs) {
     try {
       const r = await fetch(`${SYNC_API}/api/status`, {cache:'no-store'});
       if (r.ok) {
         const s = await r.json();
-        if (!s.syncing && s.lastSyncAt) return s;
+        const advanced = baselineSyncAt === undefined
+          ? !!s.lastSyncAt
+          : (s.lastSyncAt && s.lastSyncAt !== baselineSyncAt);
+        if (!s.syncing && advanced) return s;
       }
     } catch {}
     await new Promise(r => setTimeout(r, 800));
   }
   return null;
+}
+
+async function readBaselineSyncAt(retries = 15, intervalMs = 800) {
+  // Returns the current lastSyncAt from the backend, retrying briefly while
+  // the sync service is still coming up (cold launch from the .bat takes a
+  // few seconds before :8766 starts answering). Returns null if the API
+  // never becomes reachable, or if it answers but has no prior sync yet —
+  // both cases are handled correctly by waitForSyncToFinish.
+  for (let i = 0; i < retries; i++) {
+    try {
+      const r = await fetch(`${SYNC_API}/api/status`, {cache:'no-store'});
+      if (r.ok) { const s = await r.json(); return { ok: true, lastSyncAt: s.lastSyncAt || null }; }
+    } catch {}
+    await new Promise(r => setTimeout(r, intervalMs));
+  }
+  return { ok: false, lastSyncAt: null };
 }
 
 // ============== Sync Now ==============
@@ -2045,9 +2069,10 @@ async function syncNow() {
   btn.textContent = '⟳ Syncing...';
   info.textContent = '正在向 SharePoint 拉取最新版本...';
   try {
+    const baseline = await readBaselineSyncAt();
     const r = await fetch(`${SYNC_API}/api/sync`, {method:'POST'});
     if (!r.ok && r.status !== 202) throw new Error('HTTP ' + r.status);
-    const s = await waitForSyncToFinish();
+    const s = await waitForSyncToFinish(60000, baseline.lastSyncAt);
     if (s && s.lastSyncOk === false) {
       info.textContent = '同步失败：' + (s.lastError || 'unknown');
     } else {
@@ -2087,10 +2112,16 @@ window.addEventListener('DOMContentLoaded', () => {
   // On every dashboard open, kick off a background sync so the user never
   // sees a stale cache. If the sync service isn't up, this fails silently —
   // the visible ⟲ Sync Now button remains the explicit fallback.
-  fetch(`${SYNC_API}/api/sync`, {method:'POST'})
-    .then(() => waitForSyncToFinish())
-    .then(s => { if (s && s.lastSyncOk !== false) loadFromServer(); })
-    .catch(() => {});
+  (async () => {
+    try {
+      const baseline = await readBaselineSyncAt();
+      if (!baseline.ok) return;  // sync API never came up
+      const r = await fetch(`${SYNC_API}/api/sync`, {method:'POST'});
+      if (!r.ok && r.status !== 202) return;
+      const s = await waitForSyncToFinish(60000, baseline.lastSyncAt);
+      if (s && s.lastSyncOk !== false) await loadFromServer();
+    } catch {}
+  })();
   updateSyncFreshness();
   setInterval(updateSyncFreshness, 30000);
 });
